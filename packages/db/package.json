@@ -1,0 +1,17 @@
+{
+  "name": "@an/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "description": "Drizzle schema, migrations, and seed scripts for the platform Postgres+PostGIS database. Phase 2 deliverable. 19 entities per ARC §6 ERD. PostGIS geometry, pgcrypto column encryption, RLS policies, append-only audit_log trigger.",
+  "scripts": {
+    "db:migrate": "echo 'TODO Phase 2 — drizzle-kit migrate'",
+    "db:seed": "echo 'TODO Phase 2 — port mockData.ts seeds + IEBC reference data'",
+    "db:studio": "echo 'TODO Phase 2 — drizzle-kit studio'",
+    "lint": "echo 'placeholder'",
+    "type-check": "tsc --noEmit",
+    "test": "echo 'placeholder'"
+  }
+}

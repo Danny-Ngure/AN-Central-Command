@@ -1,0 +1,13 @@
+{
+  "name": "@an/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Central Command — Next.js 14 web app + API route handlers. Phase 4 deliverable.",
+  "scripts": {
+    "dev": "echo 'TODO Phase 4 — scaffold via `pnpm dlx create-next-app@latest . --typescript --app --tailwind` then port screens from prototypes/vite-react-sketch'",
+    "build": "echo 'placeholder'",
+    "lint": "echo 'placeholder'",
+    "type-check": "echo 'placeholder'",
+    "test": "echo 'placeholder'"
+  }
+}

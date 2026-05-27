@@ -1,0 +1,59 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build output
+.next
+.turbo
+dist
+build
+out
+*.tsbuildinfo
+
+# Environment — never commit (SRS §6.1)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Coverage
+coverage
+.nyc_output
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Expo
+.expo
+.expo-shared
+web-build
+
+# Mobile native build artifacts
+ios/Pods
+ios/build
+android/.gradle
+android/build
+android/app/build
+android/local.properties
+
+# Vercel
+.vercel
+
+# DB local volumes
+infra/data

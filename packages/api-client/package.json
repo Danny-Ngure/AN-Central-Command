@@ -1,0 +1,14 @@
+{
+  "name": "@an/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "description": "Typed API client + zod schemas. Consumed by apps/field and apps/nyalitrack to talk to apps/web route handlers. Schemas mirror the API request/response envelope per SRS §5.3. Generated from OpenAPI spec in Phase 4.",
+  "scripts": {
+    "lint": "echo 'placeholder'",
+    "type-check": "tsc --noEmit",
+    "test": "echo 'placeholder'"
+  }
+}

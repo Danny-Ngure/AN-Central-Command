@@ -1,0 +1,75 @@
+# Continuous integration for the AN Central Command monorepo.
+#
+# Per SRS §6.1: build, lint, test, type-check on every push.
+# Phase 1: this workflow defines the gates but most jobs are no-ops until apps/packages exist.
+# Phase 4+: full lint/test/type-check across all workspaces.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm type-check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+  # SRS NFR-016 / CON-006 — no third-party AI SDK references in production code.
+  no-llm-sdk-gate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Forbidden SDK grep
+        run: |
+          if grep -rnE "from ['\"](@anthropic-ai/sdk|openai|@google/generative-ai|cohere-ai)['\"]" apps packages 2>/dev/null; then
+            echo "Forbidden third-party LLM SDK import detected. SRS NFR-016 / CON-006 violation."
+            exit 1
+          fi
+          echo "No forbidden LLM SDK imports detected."
+
+  # SRS NFR-052 — PII redaction in application logs.
+  # Heuristic gate: flag console.log calls referencing variables named like PII.
+  pii-log-gate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: PII in logs heuristic
+        run: |
+          if grep -rnE "console\.(log|info|warn|error)\([^)]*(phone|national_?id|voter_?id|password|totp_?secret)" apps packages 2>/dev/null; then
+            echo "Possible PII in application log. SRS NFR-052 violation. Use user UUIDs instead."
+            exit 1
+          fi
+          echo "No PII-in-log patterns detected."

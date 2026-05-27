@@ -1,0 +1,24 @@
+{
+  "name": "an-central-command",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Alfayo Nelson Central Command — campaign intelligence platform (web + Field App + NyaliTrack + API). See docs/SRS-ALFAYO-001.pdf and docs/ARC-ALFAYO-001.pdf.",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.10.0"
+  }
+}

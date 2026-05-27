@@ -1,0 +1,14 @@
+{
+  "name": "@an/types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "description": "Shared TypeScript domain types for the AN Central Command platform. Single source of truth for entity shapes consumed by web, field, nyalitrack, and api-client. Generated from the Drizzle schema in @an/db once Phase 2 lands.",
+  "scripts": {
+    "lint": "echo 'placeholder'",
+    "type-check": "tsc --noEmit",
+    "test": "echo 'placeholder'"
+  }
+}

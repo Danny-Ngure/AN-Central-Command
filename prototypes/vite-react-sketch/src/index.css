@@ -1,0 +1,70 @@
+@import 'mapbox-gl/dist/mapbox-gl.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+@layer base {
+  body {
+    background-color: #000000;
+    color: #E1E4F0;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0B10;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #232535;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #32354a;
+}
+
+/* Glassmorphism Styles */
+.glass-panel {
+  background: rgba(18, 19, 28, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(35, 37, 53, 0.6);
+}
+
+.glass-panel-heavy {
+  background: rgba(10, 11, 16, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(35, 37, 53, 0.8);
+}
+
+/* Pulse animation for active simulation state */
+@keyframes soft-pulse {
+  0%, 100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.pulsing-glow {
+  animation: soft-pulse 3s infinite ease-in-out;
+}
+
+/* Micro-animations */
+.hover-scale {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-scale:hover {
+  transform: translateY(-2px);
+}

@@ -1,0 +1,54 @@
+# Local development infrastructure.
+# Mirrors the production runtime per SRS §2.3 and §6.2:
+#   - PostgreSQL 15 + PostGIS 3.3 + pgcrypto (SRS CON-003, NFR-012)
+#   - Redis 7 (cache + rate limiting + BullMQ queue per ARC §3)
+#   - MailHog (captures outbound email locally; Resend is used in staging/prod)
+#
+# Do NOT use these credentials anywhere outside local development.
+# Real environments use AWS Secrets Manager (SRS §6.2).
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: alfayo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: alfayo
+      POSTGRES_PASSWORD: localdev_only_not_production
+      POSTGRES_DB: alfayo_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alfayo -d alfayo_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: alfayo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: alfayo-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI — open http://localhost:8025
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,13 @@
+{
+  "name": "@an/field",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Field App — Expo SDK 51+ React Native app for campaign-season data collection (visits, leaders, sites, issues, supporters). Phase 5 deliverable.",
+  "scripts": {
+    "dev": "echo 'TODO Phase 5 — scaffold via `pnpm dlx create-expo-app@latest . --template`'",
+    "build": "echo 'placeholder'",
+    "lint": "echo 'placeholder'",
+    "type-check": "echo 'placeholder'",
+    "test": "echo 'placeholder'"
+  }
+}
