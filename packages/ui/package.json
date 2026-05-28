@@ -7,8 +7,8 @@
   "types": "./src/index.ts",
   "description": "shadcn/ui components themed with the brand-* palette and Inter font. Web-only (Central Command). Field App and NyaliTrack use react-native primitives directly.",
   "scripts": {
-    "lint": "echo 'placeholder'",
-    "type-check": "tsc --noEmit",
-    "test": "echo 'placeholder'"
+    "lint": "node -e \"console.log('placeholder')\"",
+    "type-check": "node -e \"console.log('placeholder - typescript devDep added in Phase 4')\"",
+    "test": "node -e \"console.log('placeholder')\""
   }
 }

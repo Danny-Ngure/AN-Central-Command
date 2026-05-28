@@ -2,12 +2,47 @@
   "name": "@an/field",
   "version": "0.0.0",
   "private": true,
-  "description": "Field App — Expo SDK 51+ React Native app for campaign-season data collection (visits, leaders, sites, issues, supporters). Phase 5 deliverable.",
+  "description": "Field App — Expo SDK 54 React Native app for campaign-season data collection (visits, leaders, sites, issues, supporters). SRS §3.12, Phase 5 deliverable.",
+  "main": "expo-router/entry",
   "scripts": {
-    "dev": "echo 'TODO Phase 5 — scaffold via `pnpm dlx create-expo-app@latest . --template`'",
-    "build": "echo 'placeholder'",
-    "lint": "echo 'placeholder'",
-    "type-check": "echo 'placeholder'",
-    "test": "echo 'placeholder'"
+    "dev": "expo start --dev-client --clear",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild",
+    "build:dev:android": "eas build --profile development --platform android --non-interactive",
+    "build:dev:ios": "eas build --profile development --platform ios --non-interactive",
+    "build:preview": "eas build --profile preview --platform all --non-interactive",
+    "lint": "node -e \"console.log('placeholder')\"",
+    "type-check": "tsc --noEmit",
+    "test": "node -e \"console.log('placeholder')\""
+  },
+  "dependencies": {
+    "@an/i18n": "workspace:*",
+    "@an/types": "workspace:*",
+    "expo": "~54.0.0",
+    "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.21",
+    "expo-linking": "~8.0.12",
+    "expo-location": "~19.0.8",
+    "expo-router": "~6.0.23",
+    "expo-secure-store": "~15.0.8",
+    "expo-splash-screen": "~31.0.13",
+    "expo-sqlite": "~16.0.10",
+    "expo-status-bar": "~3.0.9",
+    "expo-updates": "~29.0.17",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-web": "^0.21.0",
+    "uuidv7": "^1.0.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.3"
   }
 }

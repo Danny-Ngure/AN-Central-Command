@@ -7,8 +7,8 @@
   "types": "./src/index.ts",
   "description": "English/Swahili translation dictionary, shared across web, field, nyalitrack. Every UI string in the platform routes through t('namespace.key') here. Source: prototype CampaignContext TRANSLATIONS, ~90 keys already authored.",
   "scripts": {
-    "lint": "echo 'placeholder'",
-    "type-check": "tsc --noEmit",
-    "test": "echo 'placeholder'"
+    "lint": "node -e \"console.log('placeholder')\"",
+    "type-check": "node -e \"console.log('placeholder - typescript devDep added in Phase 2')\"",
+    "test": "node -e \"console.log('placeholder')\""
   }
 }

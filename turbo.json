@@ -27,8 +27,16 @@
     "db:migrate": {
       "cache": false
     },
-    "db:seed": {
+    "db:apply-extras": {
+      "cache": false,
+      "dependsOn": ["db:migrate"]
+    },
+    "db:migrate:all": {
       "cache": false
+    },
+    "db:seed": {
+      "cache": false,
+      "dependsOn": ["db:migrate:all"]
     }
   }
 }

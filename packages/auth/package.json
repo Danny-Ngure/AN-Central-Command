@@ -1,0 +1,29 @@
+{
+  "name": "@an/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "description": "Authentication primitives: Argon2id passwords, TOTP, JWT, Redis rate limiting, session lifecycle. Shared between apps/web (Next.js API routes) and apps/field / apps/nyalitrack (Expo). Implements SRS FR-001 through FR-003.",
+  "scripts": {
+    "lint": "node -e \"console.log('placeholder')\"",
+    "type-check": "tsc --noEmit",
+    "test": "node -e \"console.log('placeholder')\"",
+    "seed:credentials": "tsx src/dev/seed-credentials.ts"
+  },
+  "dependencies": {
+    "@an/db": "workspace:*",
+    "@node-rs/argon2": "^2.0.2",
+    "drizzle-orm": "^0.36.4",
+    "ioredis": "^5.4.1",
+    "jose": "^5.9.6",
+    "otplib": "^12.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "dotenv": "^16.4.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

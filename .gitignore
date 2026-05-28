@@ -57,3 +57,10 @@ android/local.properties
 
 # DB local volumes
 infra/data
+
+# Raw reference datasets — large, downloaded per dev machine.
+# The derived ward-boundaries.ts (small) IS checked in.
+tools/data/*.json
+tools/data/*.geojson
+tools/data/*.zip
+tools/data/*.sql

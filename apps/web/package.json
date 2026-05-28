@@ -2,12 +2,37 @@
   "name": "@an/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Central Command — Next.js 14 web app + API route handlers. Phase 4 deliverable.",
+  "description": "Central Command — Next.js 14 web app + API route handlers. Per SRS CON-003.",
   "scripts": {
-    "dev": "echo 'TODO Phase 4 — scaffold via `pnpm dlx create-next-app@latest . --typescript --app --tailwind` then port screens from prototypes/vite-react-sketch'",
-    "build": "echo 'placeholder'",
-    "lint": "echo 'placeholder'",
-    "type-check": "echo 'placeholder'",
-    "test": "echo 'placeholder'"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "test": "node -e \"console.log('placeholder')\""
+  },
+  "dependencies": {
+    "@an/auth": "workspace:*",
+    "@an/db": "workspace:*",
+    "@an/i18n": "workspace:*",
+    "@an/types": "workspace:*",
+    "mapbox-gl": "^3.8.0",
+    "next": "^14.2.18",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/mapbox-gl": "^3.4.1",
+    "@types/node": "^22.10.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.18",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3"
   }
 }

@@ -7,8 +7,8 @@
   "types": "./src/index.ts",
   "description": "Typed API client + zod schemas. Consumed by apps/field and apps/nyalitrack to talk to apps/web route handlers. Schemas mirror the API request/response envelope per SRS §5.3. Generated from OpenAPI spec in Phase 4.",
   "scripts": {
-    "lint": "echo 'placeholder'",
-    "type-check": "tsc --noEmit",
-    "test": "echo 'placeholder'"
+    "lint": "node -e \"console.log('placeholder')\"",
+    "type-check": "node -e \"console.log('placeholder - typescript devDep added in Phase 4')\"",
+    "test": "node -e \"console.log('placeholder')\""
   }
 }

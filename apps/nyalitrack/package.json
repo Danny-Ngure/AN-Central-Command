@@ -4,10 +4,10 @@
   "private": true,
   "description": "NyaliTrack — Expo SDK 51+ election-day operations app. Polling station status, incident reports, SMS short-code fallback. Phase 9 deliverable. Separate from the Field App for operational distinctness on D-Day.",
   "scripts": {
-    "dev": "echo 'TODO Phase 9 — scaffold via `pnpm dlx create-expo-app@latest . --template`'",
-    "build": "echo 'placeholder'",
-    "lint": "echo 'placeholder'",
-    "type-check": "echo 'placeholder'",
-    "test": "echo 'placeholder'"
+    "dev": "node -e \"console.log('TODO Phase 9: scaffold via pnpm dlx create-expo-app@latest . --template')\"",
+    "build": "node -e \"console.log('placeholder')\"",
+    "lint": "node -e \"console.log('placeholder')\"",
+    "type-check": "node -e \"console.log('placeholder')\"",
+    "test": "node -e \"console.log('placeholder')\""
   }
 }
