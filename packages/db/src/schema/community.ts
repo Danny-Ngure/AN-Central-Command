@@ -85,7 +85,34 @@ export const communitySites = pgTable(
     meetingSchedule: text('meeting_schedule'),
     // FK below — same as ownedBy on leaders (FK to people but added later if needed).
     keyContactLeaderId: uuid('key_contact_leader_id'),
+    // Contact details for the site itself — Imam, Pastor, Chairman, etc.
+    // Separate from communityLeaders because not every site needs a full leader-graph entry.
+    contactPersonName: text('contact_person_name'),
+    contactPhone: text('contact_phone'),
+    contactRole: text('contact_role'),                  // 'Imam' | 'Pastor' | 'Chairman' | ...
+    areaName: text('area_name'),                        // free-text location label from coordinator PDFs
     politicalClimate: text('political_climate'),
+    // Visited tracking — flipped per-site in the UI by ward coordinators / canvassers.
+    // visitedAt is the most recent visit; lastVisitedAt was already here for the activities-driven
+    // timeline. Keep both: `visited` is the simple "have we been here at least once?" flag.
+    visited: boolean('visited').notNull().default(false),
+    visitedAt: timestamp('visited_at', { withTimezone: true }),
+    visitedByPersonId: uuid('visited_by_person_id'),
+    // ~100-word coordinator note recorded on visit. App-layer caps at 600 chars.
+    visitNotes: text('visit_notes'),
+    // Target visit date set while still un-visited — feeds the upcoming-visits roster.
+    plannedVisitAt: timestamp('planned_visit_at', { withTimezone: true }),
+    // ── Structured post-visit assessment (required to flip `visited` on) ──
+    visitPromises:        text('visit_promises'),
+    visitBenefits:        text('visit_benefits'),
+    visitResponse:        text('visit_response'),
+    visitTemperature:     text('visit_temperature'),     // 'hot' | 'warm' | 'cold'
+    visitRecommendation:  text('visit_recommendation'),  // 'high_priority' | 'normal' | 'low_priority'
+    visitEffort:          text('visit_effort'),          // 'intensify' | 'maintain' | 'reduce'
+    // ── Pre-visit plan questionnaire ──
+    plannedPurpose:       text('planned_purpose'),
+    plannedObjectives:    text('planned_objectives'),
+    plannedAttendees:     text('planned_attendees'),
     lastVisitedAt: timestamp('last_visited_at', { withTimezone: true }),
     visitHistoryCount: integer('visit_history_count').notNull().default(0),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),

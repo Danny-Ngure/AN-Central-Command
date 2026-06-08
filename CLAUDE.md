@@ -1,228 +1,331 @@
-# CLAUDE.md
+# CLAUDE.md — Project Handoff
 
-This file orients Claude Code sessions working on **AN Central Command**. Read it first.
+This file briefs a fresh Claude Code session on the current state of **Alfayo Nelson Central Command** (campaign intelligence portal for Nyali Constituency, Mombasa, Kenya). Election: **9 August 2027**.
 
-## What this project is
+> **You are picking up a working dev environment.** Postgres + Redis are running in Docker. The web app is built. The database is populated with real voter and site data. Recent work was wide and deep — the highlights are below.
 
-A three-app campaign-intelligence platform for the Alfayo Nelson parliamentary candidacy in Nyali Constituency, Mombasa, Kenya — targeting the **9 August 2027** Kenyan general election. Built by Developers Mania.
+---
 
-The three apps share one PostgreSQL+PostGIS backend:
+## 1. Fastest way to get the app running
 
-| App | Path | Users | Stack |
-|---|---|---|---|
-| **Central Command** (web) | `apps/web/` | Candidate, campaign manager, strategist, coordinators | Next.js 14 App Router + Mapbox + Drizzle |
-| **Field App** (mobile) | `apps/field/` | Canvassers, polling agents, ward coordinators, influence liaisons | Expo SDK 54 + React Native 0.81 + SQLite outbox |
-| **NyaliTrack** (mobile, election day) | `apps/nyalitrack/` | Polling agents, war room on 9 Aug 2027 | Expo (not started yet) |
+```powershell
+# 1. Docker Desktop must be running (system tray whale icon).
+cd C:\Users\User\.gemini\antigravity\scratch\AN-Central-Command-monorepo
 
-## Authoritative specs
+# 2. Bring up infra if not already:
+docker compose -f infra/docker-compose.yml up -d
+docker ps --format "table {{.Names}}\t{{.Status}}"   # expect alfayo-postgres, alfayo-redis, alfayo-mailhog all Up
 
-When code and SRS disagree, **the SRS wins**.
+# 3. Web dev server:
+pnpm --filter @an/web dev
+```
 
-- [`docs/SRS-ALFAYO-001.pdf`](docs/SRS-ALFAYO-001.pdf) — Software Requirements (30+ FRs, 30+ NFRs)
-- [`docs/ARC-ALFAYO-001.pdf`](docs/ARC-ALFAYO-001.pdf) — 11 architecture diagrams (context, container, DFD, ERD, sequences)
-- [`docs/conventions.md`](docs/conventions.md) — Engineering conventions distilled from the SRS
-- **The 13-phase plan**: `C:\Users\User\.claude\plans\c-users-user-gemini-antigravity-scratch-iridescent-clover.md`
+Open **http://localhost:3000**. Sign in:
 
-When SRS references appear in code (`FR-130`, `BR-001.2`, `CON-008`, `NFR-050`, `DPA §26`), the cross-reference is in the SRS.
-
-## Phase status (May 2026)
-
-| Phase | Status | Where |
+| Account | Password | Notes |
 |---|---|---|
-| 0. External dependencies (ODPC reg, WhatsApp BSP, hosting, legal) | ✅ | User-driven |
-| 1. Foundation (monorepo + Docker Compose) | ✅ | Root + `infra/` |
-| 2. Schema + RLS + audit + encryption helpers | ✅ | `packages/db/` |
-| 3. Auth (Argon2id, TOTP, Redis rate-limit, JWT) | ✅ | `packages/auth/` |
-| 4. Central Command web (login, dashboard, 6 screens, Mapbox choropleth, countdown) | ✅ | `apps/web/` |
-| **5. Field App** | 🟡 **In progress** | `apps/field/` |
-| 6. Committed Supporter Network elaboration (post-ODPC) | ⏳ | `packages/db/` + `apps/web/` |
-| 7. Notifications (WhatsApp / SMS / email + BullMQ workers) | ⏳ | New `packages/notifications/` |
-| 8. Heatmaps (Coverage / Influence / Persuasion — FR-051/052/053) | ⏳ | `apps/web/` |
-| 9. NyaliTrack | ⏳ | `apps/nyalitrack/` |
-| 10. Security audit + DPIA | ⏳ | User-driven |
-| 11. Performance + DR drills | ⏳ | k6 + chaos drills |
-| 12. Election-day cutover | ⏳ | 9 Aug 2027 |
+| `+254700000001` | `devpassword123!` | **Alfayo Nelson** (candidate, Super Admin) — no 2FA, lands on dashboard |
+| `+254700000010` | `devpassword123!` | seeded canvasser — limited scope, fast smoke-test |
 
-### Phase 5 sub-status (what's done in Field App so far)
+Other team-member phones (Benson, Justine, Kofa, etc.) exist in the DB but **don't have `auth_credentials` rows yet** — they can't log in until you run `pnpm --filter @an/auth seed:credentials`, which hashes `devpassword123!` for any person without credentials.
 
-- ✅ Expo Router scaffold (pnpm-workspace-aware Metro config)
-- ✅ Login screen consuming `/api/auth/login` with `client: 'mobile'` → JWT in `expo-secure-store`
-- ✅ Authed home screen calling `/api/auth/me`, role-aware header, sign-out
-- ✅ Two-tap visit logging (`/visits/log`) with `expo-location` GPS capture
-- ✅ SQLite outbox (`lib/outbox.ts`) — enqueue/sync/retry, idempotent via UUIDv7 + server `ON CONFLICT DO NOTHING`
-- ✅ Server endpoint `POST /api/visits` (RLS-scoped, validates UUIDv7 + lat/lon + purpose enum)
-- ✅ EAS development-build configuration (`eas.json`, project bound to `kimaniimmanuel/an-field`)
-- ⏳ Auto-sync on connectivity restore (NetInfo + AppState foreground)
-- ⏳ Leader entry with canvasser review queue (FR-020 AC-020.2)
-- ⏳ Issue capture (FR-030)
-- ⏳ Site check-in (FR-021)
-- ⏳ Push notifications via Expo Push (FR-102)
-- ⏳ Biometric unlock (FR-004)
+---
 
-## ⚠️ Current open blocker — read before doing anything else
+## 2. What this session built (since the last commit `6031656`)
 
-The Field App EAS development build **fails during the Gradle phase** on EAS Build servers. The local CLI uploads cleanly; the remote Gradle compile errors out.
+The branch is uncommitted but everything below is on disk. ~50 task-tracked work items completed this session.
 
-Latest failed build: https://expo.dev/accounts/kimaniimmanuel/projects/an-field/builds/8744e98c-3132-4b1d-beb3-50be02a30ca3#run-gradlew
+### Database — 6 migrations applied to the live DB
+All committed under `packages/db/migrations/` + `meta/_journal.json` entries:
+| File | What |
+|---|---|
+| `0002_voters_and_site_visits.sql` | `voters` table + `community_sites.visited / visited_at / visited_by_person_id / contact_person_name / contact_phone / contact_role` |
+| `0003_site_visit_notes.sql` | `community_sites.visit_notes` |
+| `0004_site_area_name.sql` | `community_sites.area_name` (free-text location label) |
+| `0005_site_planned_visit.sql` | `community_sites.planned_visit_at` |
+| `0006_site_visit_details.sql` | 9 columns: `visit_promises`, `visit_benefits`, `visit_response`, `visit_temperature`, `visit_recommendation`, `visit_effort`, `planned_purpose`, `planned_objectives`, `planned_attendees` |
+| `0007_people_title.sql` | `people.title` (free-text job title alongside the role enum) |
 
-The Gradle phase log on EAS hasn't been captured here yet. **First action for the new session**: open that URL (or run `pnpm dlx eas-cli build:view 8744e98c-3132-4b1d-beb3-50be02a30ca3`), scroll the "Run gradlew" phase to "What went wrong" / "FAILURE:", paste the surrounding ~30 lines, then diagnose.
+Drizzle schema in `packages/db/src/schema/` updated to match all 6.
 
-What's been done so far on this:
-- ✅ Removed a Junction at `apps/field/node_modules` that was pointing to `C:\` root (residue from a `"": "link:/"` corruption in the package.json — now cleaned)
-- ✅ Bumped Expo from SDK 52 → 54 (React 19, RN 0.81)
-- ✅ Re-resolved all Expo peer deps via `expo install`
-- ✅ Confirmed compatibility via `expo install --check` (only minor mismatches auto-fixed)
-- ✅ Reverted `apps/field/metro.config.js` to the canonical `expo/metro-config` shape
-- ✅ Added `--non-interactive` to `build:dev:android` so the metro-config warning prompt no longer blocks
-- ❌ Need: actual Gradle error from EAS log
+### Data ingestion
+- **`/api/data-import/preview` + `/commit`** rewritten to take multipart file uploads (commit re-parses the file, no 100-row cap). Bulk-insert path for voters (500-row batches). Auto-creates polling stations from the voter file's POLLING STATION column. Auto-runs dedup at the end of every voter import.
+- **Smart multi-section sites parser** (`apps/web/lib/import-parsers.ts → parseSitesMultiSection`). Detects `NAME OF MOSQUE` / `NAME OF CHURCH` section headers in coordinator PDFs converted to Excel; derives site `type` from the section header. Falls back to standard tabular parsing.
+- **Auto-merge polling stations** after every voter import — `apps/web/lib/dedup-stations.ts` does token-Jaccard similarity matching (threshold 0.6). Seed stations absorb their auto-created twins (preserve IEBC code + turnout history); empty stations with no match get deleted.
+- Per-ward upload page at `/wards/[id]/import` (force-ward via URL).
 
-Likely suspects to investigate once the error is in hand:
-- **`react-native-reanimated` v4** requires the new architecture (`newArchEnabled: true` — we have it) AND specific babel plugin config. The new Worklets package may need a babel addition we haven't made.
-- **NDK / Kotlin / Gradle version mismatch** between Expo SDK 54 expectations and what EAS image provides.
-- **Missing native module config** for one of the plugins (expo-location, expo-secure-store, expo-sqlite).
+### Imports already in the DB
+| Ward | Voters imported | Sites |
+|---|---|---|
+| Frere Town | 16,103 | XLSX ready, not uploaded yet |
+| Kadzandani | 15,555 | XLSX uploaded by user |
+| Kongowea | 20,241 | XLSX ready |
+| Mkomani | 16,837 | XLSX ready |
+| Ziwa La Ng'ombe | 16,096 | XLSX ready |
+| **Total voters** | **~84,832 unique** | |
 
-## Architecture invariants (don't violate)
+`tools/data/` contains ready-to-upload **XLSX files** for every ward's sites (mosques + churches in coordinator-PDF format):
+- `kadzandani-sites.csv` + user uploaded `CHURCH AND MOSQUES KADZANDANI.xlsx`
+- `freretown-sites.xlsx` — 42 sites
+- `kongowea-sites.xlsx` — 46 sites
+- `mkomani-sites.xlsx` — 66 sites (10 mosques + 56 churches)
+- `ziwa-sites.xlsx` — 50 sites
+The corresponding `tools/generate-*-sites.cjs` scripts regenerate them from hardcoded parsed data.
 
-These are codified in [`docs/conventions.md`](docs/conventions.md). Highest-impact:
+### Pages — restructured with tabs
+- **`/wards/[id]`** now has **top-level tabs**: `Demographics & station size` / `Polling stations` / `Religious & social sites` / `Itinerary & meetings`. URL: `?tab=demographics|stations|sites|itinerary&siteTab=coverage|mosques|churches|social|boda|other`. **Person in Charge** orange card under the header showing ward coordinator + assistants with phone actions.
+- **`/polling-stations/[id]`** has tabs `Voters | Demographics | Turnout history` + a coordinator strip showing ward coord + assistant.
+- **`/analytics`** has 6 tabs: `Pollings | Historical results | 2013 | 2017 | 2022 | Analysis & demographics`. Data sources in `apps/web/data/elections-history.ts` + `current-polls.ts`. Pie + bar + grouped-bar + donut combos throughout. Smart-sized charts (BarChart max-w-xl, GroupedBarChart max-w-4xl, bar widths 78/66).
+- **`/team`** rebuilt as the org chart: **Executive & Technical Team** (9) + **Grassroots & Ward Coordination Team** (10 + Arnold's dual role). Avatar + ★ Super Admin / Peer badge + Dual role badge / title / role / operational base / phone + Call/SMS/WhatsApp + inline photo upload form.
 
-- **API response envelope**: every endpoint returns `{ success: boolean, data?: T, error?: { code, message, details? } }` (SRS §5.3).
-- **Datetimes**: ISO 8601 UTC over the wire, ever.
-- **IDs**: UUIDv7 — generated client-side on mobile for offline-safe idempotency.
-- **RLS, always**: every table has `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`. App connects as superuser but each transaction drops to `app_user` role via `setRequestContext()` in `@an/db/client.ts`, which also sets `app.role`, `app.ward_id`, `app.person_id` from JWT claims. Policies in `packages/db/extras/03_rls_policies.sql` read those session vars.
-- **Audit log is append-only**: trigger in `extras/01_append_only_triggers.sql` blocks UPDATE/DELETE on `audit_log`, `visits`, `station_reports`, `consent_log` for every role except the sealed `admin_audit`.
-- **Auto-audit**: every writable table has a trigger (`extras/02_audit_triggers.sql`) that inserts into `audit_log` on every INSERT/UPDATE/DELETE.
-- **404 not 403** on unauthorized supporter reads (SRS FR-130 ERR-130.2) — avoids confirming record existence to a probing attacker.
-- **Never log PII**: enforced by a CI grep gate in `.github/workflows/ci.yml`.
-- **Never call third-party LLM SDKs from production code** (SRS CON-006): enforced by the same CI gate.
+### Charts library
+`apps/web/components/charts/`:
+- `pie.tsx` — pie/donut with optional center text + legend
+- `bar-chart.tsx` — single-series vertical bars (turnout %, etc.)
+- `grouped-bar.tsx` — multi-series grouped bars (per-ward, per-cycle comparisons)
+- `horizontal-bar.tsx` — for poll standings / polling-stations-by-size
 
-## Monorepo layout
+All hand-rolled inline SVG (no chart-lib dependency).
+
+### Visit logging — structured questionnaires
+The site card on `/wards/[id]?tab=sites` has two side-by-side mini-forms:
+- **Plan a future visit** (amber): visit date + purpose + objectives + attendees (all but attendees required)
+- **Log a completed visit** (emerald): visit date + nature of interaction + promises made + response received + welcome temperature (🔥/🌤/🧊) + recommend revisit (priority/normal/low) + effort level (intensify/maintain/reduce). All required. Benefits offered is optional.
+
+Server validates required fields at `apps/web/app/api/sites/[id]/note/route.ts`. Audit log captures every transition. The site card displays everything prominently after visit is logged.
+
+### Itinerary tab
+`/wards/[id]?tab=itinerary`:
+- **🔔 Today's visits** banner (orange) if any planned for today
+- **⚠ Overdue plans** (red border) — past-due plans
+- **📅 Upcoming planned visits** (amber border)
+- **Welcome temperature** + **Revisit recommendations** summary cards
+- **✓ Recent completed visits** (emerald border) with temp + reco badges + note preview
+
+### Team Directory
+- 19 active people seeded via `tools/seed-team.cjs` (re-runnable, upserts by phone)
+- 12 leftover seed accounts deactivated (`active=false`)
+- 3 Super Admins: Alfayo Nelson, Benson Imoli, Dan Ngure
+- All others: Standard Peer access (their roles already cover what they need)
+- Photo upload: `POST /api/team/[id]/photo` → saves to `apps/web/public/team-photos/<id>.<ext>`, updates `photo_url`. Cache-busted with `?v=<timestamp>` query.
+- Phones (17 real ones loaded; Alfayo + Dan kept on placeholders pending real numbers from user):
+
+  ```
+  Alfayo Nelson     +254700000001  (PLACEHOLDER — user to provide)
+  Benson Imoli      +254725967858
+  Justine Katana    +254713168440
+  Cavins Omino      +254735683447
+  Arnold Baya       +254706547972
+  Irene Mkamburi    +254715562217
+  Dan Ngure         +254700000013  (PLACEHOLDER — user to provide)
+  Javas Tindi       +254740553475
+  Ryan Siriba       +254702884715
+  Nafisa Kalondu    +254113254609
+  Wadede Hamisi     +254726790872
+  Umi Njeri         +254724638705
+  Kofa Mohammed     +254712838800
+  Taura             +254723922193
+  Damah             +254724976672
+  Lucy Ogutu        +254702816974
+  Sammy Otenga      +254703754630
+  Salma Khalef      +254779531936
+  Jilo Mohammed     +254727515280
+  ```
+
+### Brand
+- ANHF palette in `tailwind.config.ts` — teal-blue `#025e73`, bright-orange `#ff6600`, sky-blue `#00ccff`, dark-gray `#212120`
+- `brand-violet` / `brand-cyan` etc. **kept as back-compat aliases** that now resolve to the ANHF palette (so existing class names re-skinned automatically)
+- Brand name: **"ALFAYO NELSON CENTRAL COMMAND"** in navbar + login + page title + favicon
+- Logo placeholder at `apps/web/public/logo-placeholder.svg` (red+blue triangle + database stack). Real logo: drop a `logo.png` at `apps/web/public/logo.png` — the `LogoImg` component falls back from PNG to SVG automatically.
+- **Hero countdown** strip below the navbar — months + days + hours + minutes + seconds in big boxed cells with urgency tiering (calm/active/warning/critical).
+- Sidebar entry "Zen Dashboard" renamed to **"Home"**.
+
+---
+
+## 3. Architecture invariants — don't break these
+
+### RLS pattern
+All page data fetches go through `withRlsTx(claims, async tx => …)` from `apps/web/lib/api.ts`. This drops the session into the `app_user` Postgres role and sets `app.role / app.ward_id / app.person_id` session variables. **Do not query directly with `db.select(…)` from a server component** — it bypasses RLS.
+
+### Drizzle quirk — avoid correlated subqueries
+`sql<number>\`(SELECT count(*) FROM ${voters} WHERE ${voters.wardId} = ${wards.id})\`` will silently return 0 when referenced through `${wards.id}` inside a sql template that's nested as a column projection. Pattern that works: **separate GROUP BY queries + JS Map merge**. Used throughout `dashboard/page.tsx`, `wards/page.tsx`, `wards/[id]/page.tsx`.
+
+### Routes that mutate must use `xmax = 0`
+Bulk INSERT … ON CONFLICT DO UPDATE returns rows where `xmax = 0` for true inserts vs `xmax = <tx>` for updates. The voter import uses this — comparing `createdAt` timestamps fails inside a long-running transaction because Postgres `now()` returns transaction start time.
+
+### Phone normalisation
+`normalisePhone()` in `apps/web/app/api/data-import/commit/route.ts` accepts `'723535594' | '0723535594' | '+254723535594' | '254723535594'` and returns `+254723535594`. Regex requires `^[71]\d{8}$` after stripping prefix — accepts both 07XX and 01XX (Telkom) Kenyan numbers.
+
+### DPA gate
+Voter ingestion requires `DPA_VOTER_INGEST_ENABLED=true` in `apps/web/.env.local`. Currently set. Removing it would make `/api/data-import/commit` reject voter imports with `IMPORT_VOTER_INGEST_LOCKED`.
+
+### Append-only tables
+`audit_log`, `visits`, `station_reports`, `consent_log` have Postgres triggers denying UPDATE/DELETE for all roles except `admin_audit`. Don't try to mutate them.
+
+### Identity-stable lookups in /team
+`SUPER_USER_NAMES`, `OPERATIONAL_BASE`, `DUAL_WARD_ASSIGNMENTS` are keyed by `fullName` (not phone) so phone changes don't break the org chart.
+
+### Smart sites parser is sites-only
+`parseSitesMultiSection()` is called BEFORE `parseUpload()` only when `entityType === 'sites'`. Voters / polling_stations / community_leaders always go through the standard tabular parser.
+
+---
+
+## 4. Recent open threads / what's queued
+
+### Immediate (high-value follow-ups)
+1. **Real phones for Alfayo Nelson + Dan Ngure** — user will provide. Then run:
+   ```sql
+   UPDATE people SET phone = '+254...' WHERE full_name = 'Alfayo Nelson';
+   UPDATE people SET phone = '+254...' WHERE full_name = 'Dan Ngure';
+   ```
+   The `SUPER_USER_NAMES` set in `/team/page.tsx` is keyed by name so the Super Admin badge survives.
+2. **Login credentials for the 16 new team members** — `pnpm --filter @an/auth seed:credentials` hashes `devpassword123!` for anyone without credentials. Then each team member can sign in with their phone + that password (and enroll TOTP for the 2FA-required roles like campaign_manager / chief_strategist / ward_coordinator).
+3. **Real logo PNG** — drop at `apps/web/public/logo.png`. The `LogoImg` component auto-prefers it over the SVG placeholder.
+4. **Upload Frere Town + Kongowea + Mkomani + Ziwa sites** — XLSX files are sitting in `tools/data/`. The user has uploaded Kadzandani; the other four are queued.
+
+### Field App
+`apps/field/` (Expo SDK 54 + React Native 0.81 + Expo Router) is scaffolded but the EAS development build is **still failing in remote Gradle**. The latest failed build was at https://expo.dev/accounts/kimaniimmanuel/projects/an-field/builds/8744e98c-3132-4b1d-beb3-50be02a30ca3 — earlier session added `react-native-worklets/plugin` to `babel.config.js` (likely fix for Reanimated 4 + new architecture) but a fresh build hasn't been triggered. Diagnose via the EAS log "What went wrong" line.
+
+### Phase 7 (Notifications & Integrations)
+Notifications + WhatsApp BSP + SMS integrations not started. The phone action buttons (Call/SMS/WhatsApp) on every contact across the app are wired via `tel:` / `sms:` / `wa.me/` deeplinks — they work for one-to-one but bulk broadcast needs:
+- WhatsApp Business API account (360dialog or Africa's Talking, 4-8 week approval — DEP-001 in SRS)
+- Africa's Talking SMS for fallback
+- BullMQ worker process for queueing
+
+### Deferred items from the original 13-phase roadmap
+Phase 6 (Committed Supporter Network), Phase 8 (Analytics heatmaps), Phase 9 (NyaliTrack election-day app), Phase 10 (security audit + DPIA), Phase 11 (perf + reliability), Phase 12 (election-day cutover).
+
+---
+
+## 5. Project layout
 
 ```
 AN-Central-Command-monorepo/
 ├── apps/
-│   ├── web/                # Next.js 14 + Drizzle + Mapbox — Central Command
-│   ├── field/              # Expo SDK 54 + RN 0.81 — Field App
-│   └── nyalitrack/         # Placeholder — Phase 9
+│   ├── web/                          # Next.js 14 — primary
+│   │   ├── app/(authed)/             # auth boundary + sidebar shell
+│   │   │   ├── dashboard/            # Home (renamed from "Zen Dashboard")
+│   │   │   ├── wards/                # /wards index + /wards/[id] (4 tabs) + /wards/[id]/voters + /wards/[id]/import
+│   │   │   ├── voters/               # constituency-wide voter search
+│   │   │   ├── polling-stations/[id] # 3 tabs: Voters / Demographics / Turnout
+│   │   │   ├── analytics/            # 6 tabs: Pollings / History / 2013 / 2017 / 2022 / Analysis
+│   │   │   ├── team/                 # org chart with photo upload
+│   │   │   ├── data-import/          # global import UI
+│   │   │   └── audit, community, issues, supporters, ...
+│   │   ├── app/api/
+│   │   │   ├── auth/                 # login, logout, me, enroll-totp
+│   │   │   ├── data-import/          # preview, commit (multipart, multi-section sites parser)
+│   │   │   ├── polling-stations/dedup # smart merge endpoint
+│   │   │   ├── sites/[id]/note       # visit log with 8 required fields
+│   │   │   ├── sites/[id]/toggle-visited
+│   │   │   └── team/[id]/photo       # multipart photo upload
+│   │   ├── components/
+│   │   │   ├── charts/               # pie, bar, grouped-bar, horizontal-bar
+│   │   │   ├── brand.tsx + logo-img.tsx
+│   │   │   ├── countdown.tsx         # hero countdown with months
+│   │   │   ├── phone-actions.tsx     # Call/SMS/WhatsApp buttons
+│   │   │   ├── voter-list.tsx        # shared paginated voter table
+│   │   │   ├── navbar.tsx, sidebar.tsx, logout-button.tsx
+│   │   ├── data/
+│   │   │   ├── elections-history.ts  # 2013/2017/2022 IEBC tallies + per-ward
+│   │   │   └── current-polls.ts      # Swiss Poll Int + Politrack
+│   │   ├── lib/
+│   │   │   ├── api.ts                # withAuth, withRlsTx, ok/err envelopes
+│   │   │   ├── server-auth.ts        # getServerAuthOrRedirect
+│   │   │   ├── import-parsers.ts     # tabular + multi-section sites parsers
+│   │   │   └── dedup-stations.ts     # token-Jaccard merge logic
+│   │   └── public/
+│   │       ├── logo.png              # NOT YET — drop here when user provides
+│   │       ├── logo-placeholder.svg  # ANHF-coloured fallback
+│   │       └── team-photos/          # uploaded portraits, served as-is
+│   └── field/                        # Expo (build failing — see §4)
 ├── packages/
-│   ├── db/                 # Drizzle schema, migrations, extras/, seed
-│   ├── auth/               # Argon2id, TOTP, JWT, Redis, sessions
-│   ├── types/              # Shared TypeScript types
-│   ├── i18n/               # en/sw dictionary
-│   ├── ui/                 # Placeholder — shadcn/ui shared components
-│   └── api-client/         # Placeholder — typed client for mobile
-├── infra/
-│   ├── docker-compose.yml  # Postgres+PostGIS:5433, Redis, MailHog
-│   └── init/01-extensions.sql  # postgis, pgcrypto, admin_audit role
+│   ├── db/
+│   │   ├── migrations/               # 0000–0007 applied
+│   │   ├── extras/                   # append-only triggers + RLS + pgcrypto
+│   │   └── src/schema/
+│   │       ├── audit.ts, geography.ts, identity.ts, community.ts,
+│   │       │   activities.ts, supporters.ts, election.ts, voters.ts
+│   └── auth/                         # Argon2id + TOTP + jose JWT + Redis rate limit
 ├── tools/
-│   ├── fetch-ward-boundaries.ts  # Generates apps/web/components/map/ward-boundaries.ts
-│   └── data/               # Gitignored — raw datasets (e.g., Kenya wards GeoJSON)
-├── docs/
-│   ├── SRS-ALFAYO-001.pdf
-│   ├── ARC-ALFAYO-001.pdf
-│   └── conventions.md
-├── prototypes/
-│   └── vite-react-sketch/  # Original Vite prototype — UX reference, read-only
-└── .github/workflows/ci.yml
+│   ├── seed-team.cjs                 # 19 team members, idempotent
+│   ├── generate-{ward}-sites.cjs     # one per ward, regenerates XLSX files
+│   └── data/                         # gitignored — generated XLSX + CSV files for upload
+└── infra/
+    └── docker-compose.yml            # Postgres+PostGIS (5433), Redis, MailHog
 ```
 
-## Local dev — start everything
+---
+
+## 6. Quick reference — common ops
 
 ```powershell
-# 1. Bring up Postgres+PostGIS, Redis, MailHog.
-docker compose -f infra/docker-compose.yml up -d
+# Re-seed the team (idempotent — UPSERTs)
+node tools/seed-team.cjs
 
-# 2. Make sure each app has .env.local (copy from .env.example, fill in secrets).
-Copy-Item packages/db/.env.example packages/db/.env.local
-Copy-Item packages/auth/.env.example packages/auth/.env.local
-Copy-Item apps/web/.env.example apps/web/.env.local
-Copy-Item apps/field/.env.example apps/field/.env.local
+# Regenerate a ward sites XLSX (after editing the source data inside the cjs)
+node tools/generate-kongowea-sites.cjs
 
-# 3. Apply schema + RLS + triggers + seed data + dev passwords.
-pnpm db:migrate:all          # auto-generated migrations + extras (RLS, triggers, encryption helpers)
-pnpm db:seed                 # 17 entity types — see packages/db/src/seed/index.ts
-pnpm --filter @an/auth seed:credentials   # hashes 'devpassword123!' for every seeded person
+# Apply a new migration manually
+docker cp ./packages/db/migrations/000X_yourname.sql alfayo-postgres:/tmp/m.sql
+docker exec alfayo-postgres bash -c "psql -U alfayo -d alfayo_dev -f /tmp/m.sql"
 
-# 4. Run.
-pnpm --filter @an/web dev    # Next.js → http://localhost:3000
-pnpm --filter @an/field dev  # Metro bundler (requires dev build APK installed on phone)
+# Run constituency-wide dedup after dropping new data
+# (or trigger via UI: Wards → "⚙ Merge & clean up duplicates (all wards)")
+
+# Type-check just the web app
+pnpm --filter @an/web type-check
+
+# Dev server
+pnpm --filter @an/web dev
+
+# Seed login credentials for any new team members
+pnpm --filter @an/auth seed:credentials
 ```
 
-## Test accounts (all password `devpassword123!`)
+---
 
-No 2FA — direct sign-in:
+## 7. Known type-check noise
 
-| Phone | Role | Scope |
-|---|---|---|
-| `+254700000001` | candidate | constituency-wide |
-| `+254700000010` | canvasser | Kongowea, self-registered only |
-| `+254700000011` | polling_agent | Frere Town station |
-| `+254700000012` | influence_liaison | Kadzandani |
-| `+254700000014` | patron_ceo | constituency-wide read-only |
-| `+254700000015` | finance_lead | activities only |
+`pnpm --filter @an/web type-check` still emits pre-existing errors that aren't from this work:
+- `Cannot find module 'drizzle-orm'` — moduleResolution config glitch, affects every page; doesn't block dev or build
+- `app/api/auth/me/route.ts` — stale withAuth type signature
+- `lib/api.ts (92, 97)` — `$client` missing on PgTransaction
+- `mapbox-gl/dist/mapbox-gl.css` — type declarations missing
 
-2FA required — must enroll via web `/enroll-totp` on first login:
+All four pre-date this session. Filter them out when grepping for new errors:
+```powershell
+pnpm --filter @an/web type-check 2>&1 | grep -vE "drizzle-orm|mapbox-gl/dist|api\.ts\(9[27]|auth/me/route"
+```
 
-| Phone | Role | Scope |
-|---|---|---|
-| `+254700000002` | campaign_manager | constituency-wide |
-| `+254700000005` to `+254700000009` | ward_coordinator | their ward only (Kadzandani, Kongowea, Mkomani, Frere Town, Ziwa La Ng'ombe) |
-| `+254700000013` | tech_lead | full admin |
+---
 
-## Useful commands
+## 8. Specs cross-reference
 
-| Command | What it does |
-|---|---|
-| `pnpm db:migrate:all` | drizzle-kit migrate + apply hand-written extras (RLS, triggers, encryption) |
-| `pnpm db:seed` | Populate Nyali wards, polling stations, people, supporters, activities |
-| `pnpm db:studio` | Drizzle Studio at http://localhost:4983 |
-| `pnpm fetch:boundaries` | Regenerate ward polygons from `tools/data/*.json` or OSM |
-| `pnpm --filter @an/web dev` | Next.js dev server |
-| `pnpm --filter @an/web build` | Production build |
-| `pnpm --filter @an/field dev` | Metro bundler (dev client must be installed) |
-| `pnpm --filter @an/field build:dev:android` | EAS cloud build of Android dev client APK |
-| `pnpm --filter @an/auth seed:credentials` | Hash dev password for every seeded person |
+Original specs live at the repo root:
+- `SRS-ALFAYO-001.pdf` — 30+ FRs, 30+ NFRs
+- `ARC-ALFAYO-001.pdf` — 11 architecture diagrams
+- `ARC-ALFAYO-001.txt` — plaintext extract (grep this)
 
-## Sourcing real ward boundaries
+When code mentions things like `BR-130.1` or `DPA §26`, those are cross-references.
 
-`apps/web/components/map/ward-boundaries.ts` is **auto-generated** by `pnpm fetch:boundaries`. Don't hand-edit. Recommended source: the user's Kenya wards GeoJSON dropped at `tools/data/*.json` (the script picks the most recent one). Expected property keys: `IEBC_WARDS` / `NAME` / `ADM3_EN` for ward name, `CONSTITUEN` / `ADM2_EN` for constituency. Falls back to OSM Overpass (incomplete for Kenya) or hand-crafted approximations.
+Recent additions explicitly tracked against SRS:
+- FR-090 election countdown — implemented (hero strip)
+- FR-091 constituency map — implemented (Mapbox with SVG fallback)
+- BR-130.1 documented consent — enforced in voter import + supporter creation
+- NFR-050 audit log append-only — triggers in place
+- NFR-052 PII redaction in logs — voter imports log filename + counts only
 
-## Gotchas seen in this codebase
+---
 
-- **Windows + pnpm + workspace deps**: a `"": "link:/"` in any workspace `package.json` makes pnpm create a Junction to `C:\` at `node_modules`, which then crashes future installs at `lstat 'C:\swapfile.sys'`. If you see this error: check the offending workspace's `package.json` for empty-named or root-link deps and delete the Junction with `(Get-Item path).Delete()` (NOT `Remove-Item -Recurse` — that follows the link).
-- **Next.js `export const runtime`**: parsed statically. `export const runtime = nodeRuntime` (re-exported) does NOT work — Next reads the literal token. Must be `export const runtime = 'nodejs'` inline in every route file.
-- **ESM hoisting**: in scripts that `config({ path: '.env.local' })` AND `import` `@an/db`, the import is hoisted above the config call → `@an/db/client.ts` runs and throws "DATABASE_URL missing" before dotenv loads. Fix: put the dotenv call in a side-effect module (`env-bootstrap.ts`) and import it FIRST so ESM evaluates it before `@an/db`. See `packages/auth/src/dev/seed-credentials.ts`.
-- **Webpack + native modules**: Next.js's `transpilePackages: ['@an/auth']` walks into `@node-rs/argon2` and tries to bundle the `.node` binary. Fix already applied via `webpack.config.externals` in `apps/web/next.config.mjs`.
-- **EAS metro-config heuristic**: warns even when `metro.config.js` does extend `expo/metro-config`. The warning is non-fatal; `--non-interactive` lets the build proceed.
+## 9. If you're starting work
 
-## What was last touched in the previous session
+1. Read this file (you're doing it).
+2. `git status` — see what's uncommitted. Most of this session's work is unstaged.
+3. Check Docker is running: `docker ps`.
+4. Start the web app: `pnpm --filter @an/web dev`.
+5. Sign in as Alfayo (`+254700000001` / `devpassword123!`).
+6. Click around — `/team`, `/wards/[any]` (open Itinerary tab), `/analytics`, `/data-import` — to get a feel.
+7. When in doubt, search the file. Most non-trivial logic has a comment block explaining why.
 
-Roughly in order:
-1. Replaced hand-crafted polygons with real IEBC ward boundaries via `tools/fetch-ward-boundaries.ts` + user-supplied dataset
-2. Added IEBC attribution to map footer
-3. `tools/data/*` and `*.sql` added to `.gitignore`
-4. SQL UPDATE emitter for ward voter counts (untested — dataset didn't have those columns)
-5. Election countdown widget at `apps/web/components/countdown.tsx`, embedded in navbar
-6. **Phase 5 visit-logging full slice**:
-   - `apps/web/app/api/visits/route.ts` (server, idempotent ON CONFLICT)
-   - `apps/field/lib/{uuid,gps,outbox}.ts`
-   - `apps/field/app/(authed)/visits/log.tsx`
-   - Updated `apps/field/app/(authed)/index.tsx` to wire the action button + sync badge
-7. Moved Field App to Expo Development Build:
-   - `apps/field/eas.json` (3 profiles)
-   - `expo-dev-client` dep
-   - `eas-cli` in root devDeps
-   - `apps/field/README.md` rewritten with dev-build workflow
-8. Upgraded Expo SDK 52 → 54 (React 19, RN 0.81)
-9. Cleaned up a `C:\` Junction at `apps/field/node_modules` (residue from a `"": "link:/"` corruption)
-10. Got the EAS build to upload + queue successfully — but it's failing in the remote Gradle phase
-
-## Original prototype
-
-The Vite + React in-memory prototype that this codebase is derived from lives at `prototypes/vite-react-sketch/` (and also at the user's original scratch dir `C:\Users\User\.gemini\antigravity\scratch\AN-Central-Command\`). Treat as UX reference, NOT as a code source. The data shapes in `prototypes/vite-react-sketch/src/data/mockData.ts` were the head start for the Drizzle schema.
-
-## First action for the next session
-
-1. Read this file end-to-end.
-2. Open the failing EAS build URL above (or run `pnpm dlx eas-cli build:view 8744e98c-3132-4b1d-beb3-50be02a30ca3`) and capture the actual Gradle error.
-3. Diagnose. Most likely candidates noted in the "Current open blocker" section above.
-4. Once the dev build APK installs cleanly on a phone + connects to Metro, the next slice is **auto-sync on connectivity restore** for the offline outbox (NetInfo + AppState listener in `apps/field/lib/outbox.ts`).
+The user works directively and quickly. Prefer shipping small slices that ladder up to a clear ask rather than asking many clarifying questions. They will tell you when scope is wrong.

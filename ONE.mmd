@@ -1,0 +1,311 @@
+erDiagram
+    %% ============================================================
+    %% GEOGRAPHY  — the spatial spine of the platform
+    %% ============================================================
+    constituencies ||--o{ wards : "contains"
+    wards ||--o{ sub_locations : "contains"
+    wards ||--o{ villages : "contains"
+    wards ||--o{ polling_stations : "contains"
+    sub_locations ||--o{ villages : "contains"
+    sub_locations ||--o{ polling_stations : "contains"
+
+    constituencies {
+        uuid id PK
+        text iebc_code UK "e.g. 028 for Nyali"
+        text name
+        text county_name "Mombasa"
+        int registered_voters
+        geometry boundary
+    }
+    wards {
+        uuid id PK
+        uuid constituency_id FK
+        text iebc_code UK
+        text name
+        int registered_voters
+        geometry boundary
+        int coverage_percent
+    }
+    sub_locations {
+        uuid id PK
+        uuid ward_id FK
+        text name
+        geometry boundary
+    }
+    villages {
+        uuid id PK
+        uuid ward_id FK
+        uuid sub_location_id FK
+        text name
+        text_array aliases
+        geometry centroid "NOT NULL"
+        int population_estimate
+    }
+    polling_stations {
+        uuid id PK
+        uuid ward_id FK
+        uuid sub_location_id FK
+        text iebc_code UK
+        text name
+        geometry location "NOT NULL"
+        int registered_voters
+        int turnout_2022
+        int target_turnout
+    }
+
+    %% ============================================================
+    %% IDENTITY  — campaign team + sessions
+    %% ============================================================
+    people ||--o| auth_credentials : "1:1 login"
+    people ||--o{ sessions : "issued to"
+    wards ||--o{ people : "scoped to"
+
+    people {
+        uuid id PK
+        uuid ward_id FK "null for constituency roles"
+        text phone UK
+        text email UK
+        text national_id "pgcrypto"
+        text full_name
+        enum role "15 campaign roles"
+        bool active
+        ts last_active_at
+    }
+    auth_credentials {
+        uuid id PK
+        uuid person_id FK
+        text password_hash "Argon2id"
+        text totp_secret "pgcrypto"
+        int failed_login_attempts
+        ts locked_until
+    }
+    sessions {
+        uuid id PK
+        uuid person_id FK
+        text token UK
+        inet ip_address
+        ts expires_at
+        ts revoked_at
+    }
+
+    %% ============================================================
+    %% VOTERS  — IEBC register subset (DPA-gated ingest)
+    %% ============================================================
+    wards ||--o{ voters : "registered in"
+    polling_stations ||--o{ voters : "assigned to"
+
+    voters {
+        uuid id PK
+        text voter_number UK
+        text national_id "pgcrypto"
+        text surname
+        text first_name
+        date date_of_birth
+        enum gender "M / F / U"
+        uuid ward_id FK
+        uuid polling_station_id FK
+        text phone "+254 E.164"
+        text phone_tail "last 4 visible"
+        enum registration_source
+        ts consent_withdrawn_at
+    }
+
+    %% ============================================================
+    %% COMMUNITY  — leaders, sites, village-level issues
+    %% ============================================================
+    wards ||--o{ community_sites : "located in"
+    villages ||--o{ community_sites : "in village"
+    community_sites ||--o{ community_leaders : "key contact"
+    wards ||--o{ community_leaders : "scoped to"
+    villages ||--o{ community_leaders : "in village"
+    people ||--o{ community_leaders : "owned by"
+    villages ||--o{ village_issues : "raised in"
+    wards ||--o{ village_issues : "denormalised"
+    people ||--o{ village_issues : "reported by"
+
+    community_sites {
+        uuid id PK
+        uuid ward_id FK
+        uuid village_id FK
+        text type "church / mosque / market / boda_stage / ..."
+        text name
+        geometry location "NOT NULL"
+        text contact_person_name
+        text contact_phone
+        text contact_role
+        bool visited
+        ts visited_at
+        uuid visited_by_person_id
+        int visit_history_count
+    }
+    community_leaders {
+        uuid id PK
+        uuid ward_id FK
+        uuid village_id FK
+        uuid affiliated_site_id FK
+        uuid owned_by_person_id FK
+        text full_name
+        text phone
+        text whatsapp_phone
+        text role_title
+        enum influence_reach
+        enum political_lean
+        enum relationship_temperature
+        text sensitive_notes "pgcrypto, role-gated"
+        bool is_queued_for_review
+    }
+    village_issues {
+        uuid id PK
+        uuid village_id FK
+        uuid ward_id FK
+        uuid reported_by_person_id FK
+        text category
+        text title "max 120 chars"
+        enum severity
+        enum status
+        int affects_estimated_voters
+        bool verified
+    }
+
+    %% ============================================================
+    %% ACTIVITIES  — visits, planned events, meetings
+    %% ============================================================
+    wards ||--o{ activities : "scoped to"
+    villages ||--o{ activities : "in village"
+    people ||--o{ activities : "owned by"
+    people ||--o{ visits : "logged by"
+    villages ||--o{ visits : "in village"
+    people ||--o{ meetings : "owned by"
+
+    activities {
+        uuid id PK
+        uuid ward_id FK
+        uuid village_id FK
+        uuid owner_person_id FK
+        text title
+        text type "rally / baraza / mosque_visit / ..."
+        ts scheduled_at
+        enum status
+        bool candidate_attended
+        int expected_attendance
+        int actual_attendance
+    }
+    visits {
+        uuid id PK "client-gen UUIDv7"
+        uuid visiting_person_id FK
+        uuid village_id FK
+        geometry location "NOT NULL"
+        text purpose
+        int engagement_count
+        text notes
+        ts created_at "APPEND-ONLY"
+    }
+    meetings {
+        uuid id PK
+        uuid owner_person_id FK
+        text title
+        enum type "internal / baraza / harambee / ..."
+        ts scheduled_at
+        enum status
+        uuid_array invitee_person_ids
+        uuid_array stakeholder_notified_person_ids
+        text outcome_notes
+    }
+
+    %% ============================================================
+    %% SUPPORTERS  — RESTRICTED. DPA §44-45 sensitive data.
+    %% ============================================================
+    people ||--o{ community_programs : "lead coordinator"
+    community_programs ||--o{ committed_supporters : "enrolled in"
+    polling_stations ||--o{ committed_supporters : "votes at"
+    wards ||--o{ committed_supporters : "scoped to"
+    villages ||--o{ committed_supporters : "in village"
+    people ||--o{ committed_supporters : "registered by"
+    committed_supporters ||--o{ consent_log : "consent events"
+    people ||--o{ consent_log : "actor"
+
+    community_programs {
+        uuid id PK
+        uuid lead_coordinator_person_id FK
+        text name
+        text type "bursary / water_project / harambee / ..."
+        uuid_array ward_scope
+        uuid_array village_scope
+        int estimated_beneficiary_count
+        date started_at
+    }
+    committed_supporters {
+        uuid id PK
+        uuid polling_station_id FK
+        uuid ward_id FK
+        uuid village_id FK
+        uuid community_program_id FK
+        uuid registering_person_id FK
+        text full_name
+        text national_id_masked "pgcrypto"
+        text phone
+        enum commitment_tier "strong / likely / probable / unverified"
+        enum consent_capture_method "verbal / written / sms / app"
+        ts consent_captured_at
+        date last_verified_date
+        bool withdrawn
+    }
+    consent_log {
+        uuid id PK
+        uuid supporter_id FK
+        uuid actor_person_id FK
+        enum event_type "capture / re_verification / withdrawal"
+        enum method
+        text request_source
+        text outcome_notes
+        ts created_at "APPEND-ONLY"
+    }
+
+    %% ============================================================
+    %% ELECTION  — D-Day station reports + incidents
+    %% ============================================================
+    polling_stations ||--o{ station_reports : "reported at"
+    people ||--o{ station_reports : "agent"
+    polling_stations ||--o{ incidents : "occurred at"
+    people ||--o{ incidents : "reported by"
+
+    station_reports {
+        uuid id PK "client-gen UUIDv7"
+        uuid polling_station_id FK
+        uuid agent_person_id FK
+        enum report_type "check_in / hourly_turnout / materials / closing"
+        int turnout_count
+        text notes
+        enum source "app / sms"
+        ts created_at "APPEND-ONLY"
+    }
+    incidents {
+        uuid id PK
+        uuid polling_station_id FK
+        uuid reported_by_person_id FK
+        enum category "intimidation / obstruction / ballot / violence / ..."
+        enum severity "minor / moderate / serious / critical"
+        text description
+        text photo_url
+        geometry location
+        enum status "reported / investigating / resolved / escalated"
+        ts escalated_at
+        ts resolved_at
+    }
+
+    %% ============================================================
+    %% AUDIT  — append-only, no schema FKs (actor stored loose)
+    %% ============================================================
+    audit_log {
+        uuid id PK
+        ts timestamp "clock_timestamp()"
+        uuid actor_person_id "logical, no FK"
+        text actor_role
+        text action "CREATE_ISSUE / READ_LEADER_CONTACT / ..."
+        text entity_type
+        uuid entity_id "logical, no FK"
+        jsonb before_value
+        jsonb after_value
+        inet ip_address
+        jsonb context
+    }

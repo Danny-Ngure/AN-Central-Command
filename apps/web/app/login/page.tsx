@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { BrandMark } from '@/components/brand';
 import { getServerAuth } from '@/lib/server-auth';
 import { LoginForm } from './login-form';
 
@@ -10,9 +11,10 @@ export default async function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <div className="text-xs uppercase tracking-[0.3em] text-brand-textMuted">
-            AN Central Command
+        <div className="flex flex-col items-center space-y-3">
+          <BrandMark size={84} withName={false} />
+          <div className="text-base font-extrabold tracking-[0.18em] text-brand-textActive uppercase text-center">
+            Alfayo Nelson<br />Central Command
           </div>
           <h1 className="text-2xl font-bold text-brand-textActive">Sign in</h1>
           <p className="text-sm text-brand-textMuted">
@@ -27,6 +29,9 @@ export default async function LoginPage() {
         <p className="text-xs text-brand-textMuted text-center">
           Authorised personnel only. Unauthorised access is an offence under the
           Computer Misuse and Cybercrimes Act, 2018.
+        </p>
+        <p className="text-[10px] tracking-[0.22em] uppercase text-brand-textMuted/80 text-center pt-2">
+          Created by <span className="text-brand-orangeBright font-bold">Danny Ngure</span> © 2026 · All rights reserved
         </p>
       </div>
     </main>

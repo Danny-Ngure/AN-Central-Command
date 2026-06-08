@@ -2,13 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Stylised cursive helper (agent-card tagline). Signatures themselves are images. */
+.font-signature { font-family: 'Brush Script MT', 'Segoe Script', cursive; }
+
+/*
+ * ANHF theme system.
+ *
+ * Surface colours (bg / card / border / text) are driven by CSS variables so the
+ * whole app can switch between LIGHT (default) and DARK by toggling `.dark` on
+ * <html>. Tailwind tokens in tailwind.config.ts read these vars via
+ * rgb(var(--c-…) / <alpha-value>). The six BRAND ACCENT colours stay constant
+ * across both themes.
+ *
+ * Vars are stored as space-separated RGB channels so Tailwind opacity modifiers
+ * (e.g. bg-brand-cardBg/50) keep working.
+ */
+:root {
+  /* ----- LIGHT theme surfaces (default) ----- */
+  --c-bg:            251 241 227;   /* #FBF1E3 warm cream page  */
+  --c-card:          255 255 255;   /* #FFFFFF white card        */
+  --c-card-heavy:    245 234 218;   /* #F5EADA cream inset       */
+  --c-panel:         248 239 225;   /* #F8EFE1 panel             */
+  --c-border:        232 218 196;   /* #E8DAC4 light divider     */
+  --c-border-strong: 214 191 159;   /* #D6BF9F tan border        */
+  --c-field:         250 247 240;   /* #FAF7F0 input background   */
+  --c-text-active:    36  28  18;   /* #241C12 headings          */
+  --c-text-body:      74  62  46;   /* #4A3E2E body              */
+  --c-text-muted:    131 113  90;   /* #83715A muted             */
+
+  /* ----- six brand accent colours (constant both themes) ----- */
+  --brand-burnt:  #BE5103;   /* 1 primary    */
+  --brand-gold:   #FFCE1B;   /* 2 highlight  */
+  --brand-teal:   #069494;   /* 3 info/links */
+  --brand-rust:   #B7410E;   /* 4 action     */
+  --brand-olive:  #807040;   /* 5 muted      */
+  --brand-brown:  #8D5A2B;   /* 6 borders    */
+
+  /* Legacy var names rebound to the palette (raw CSS / inline SVG). */
+  --anhf-teal-blue:           #BE5103;
+  --anhf-bright-orange:       #BE5103;
+  --anhf-sky-blue:            #069494;
+  --anhf-dark-gray:           #2a2419;
+  --secondary-deep-blue:      #8D5A2B;
+  --secondary-vibrant-orange: #B7410E;
+  --interface-primary-orange: #B7410E;
+  --interface-aqua-blue:      #069494;
+  --interface-text-black:     #333333;
+  --interface-medium-gray:    #6b6b6b;
+  --interface-light-gray:     #e0e0e0;
+  --bg-pure-white:            #ffffff;
+  --bg-off-white:             #f5f5f5;
+  --text-body-gray:           #555555;
+  --text-accent-dark-gray:    #212121;
+}
+
+/* ----- DARK theme surfaces ----- */
+.dark {
+  --c-bg:            20  17  13;    /* #14110D warm near-black  */
+  --c-card:          28  24  19;    /* #1C1813 card             */
+  --c-card-heavy:    37  32  26;    /* #25201A inset            */
+  --c-panel:         42  36  25;    /* #2A2419 panel            */
+  --c-border:        58  48  38;    /* #3A3026 divider          */
+  --c-border-strong: 92  74  51;    /* #5C4A33 border           */
+  --c-field:         12  10   7;    /* #0C0A07 input background  */
+  --c-text-active:  255 255 255;    /* #FFFFFF headings         */
+  --c-text-body:    236 227 212;    /* #ECE3D4 body             */
+  --c-text-muted:   168 154 130;    /* #A89A82 muted            */
+}
+
 @layer base {
-  html {
-    color-scheme: dark;
-  }
+  :root { color-scheme: light; }
+  .dark { color-scheme: dark; }
+
   body {
-    background-color: #000;
-    color: #E1E4F0;
+    background-color: rgb(var(--c-bg));
+    color: rgb(var(--c-text-active));
     font-family: Inter, system-ui, sans-serif;
   }
+
+  /* Scrollbar — themed. */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: rgb(var(--c-card-heavy)); }
+  ::-webkit-scrollbar-thumb { background: rgb(var(--c-border-strong)); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--brand-brown); }
+
+  /* Selection — burnt-orange accent. */
+  ::selection { background: rgba(190, 81, 3, 0.22); }
 }

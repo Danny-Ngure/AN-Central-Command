@@ -29,11 +29,12 @@ const STATUS_STYLE: Record<string, string> = {
   dismissed: 'text-brand-textMuted',
 };
 
-export default async function IssuesPage() {
+export default async function IssuesPage({ searchParams }: { searchParams: { ward?: string } }) {
   const claims = await getServerAuthOrRedirect();
+  const wardFilter = searchParams.ward ?? null;
 
   const data = await withRlsTx(claims, async (tx) => {
-    const issueRows = await tx
+    const allIssues = await tx
       .select({
         id: villageIssues.id,
         category: villageIssues.category,
@@ -50,6 +51,9 @@ export default async function IssuesPage() {
       .from(villageIssues)
       .orderBy(desc(villageIssues.createdAt));
 
+    // Optional ward scoping via ?ward=<id> (on top of RLS). Used by the Wards menu.
+    const issueRows = wardFilter ? allIssues.filter((i) => i.wardId === wardFilter) : allIssues;
+
     const wardMap = new Map((await tx.select({ id: wards.id, name: wards.name }).from(wards)).map((w) => [w.id, w.name]));
     const villageMap = new Map((await tx.select({ id: villages.id, name: villages.name }).from(villages)).map((v) => [v.id, v.name]));
 
@@ -60,15 +64,23 @@ export default async function IssuesPage() {
       }
     }
 
-    return { issueRows, wardMap, villageMap, bySeverity };
+    return { issueRows, wardMap, villageMap, bySeverity, wardFilterName: wardFilter ? wardMap.get(wardFilter) ?? null : null };
   });
 
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-brand-textActive">Issue Tracker</h1>
+        <h1 className="text-2xl font-bold text-brand-textActive">
+          Issue Tracker
+          {data.wardFilterName && <span className="text-brand-burnt"> · {data.wardFilterName}</span>}
+        </h1>
         <p className="text-sm text-brand-textMuted">
           Village-level grievances. Scoped to your authorised wards.
+          {data.wardFilterName && (
+            <>
+              {' '}<a href="/issues" className="text-brand-teal hover:underline font-semibold">Show all wards</a>
+            </>
+          )}
         </p>
       </header>
 
@@ -87,7 +99,7 @@ export default async function IssuesPage() {
 
       <section className="rounded-xl border border-brand-border bg-brand-cardBg overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-black/40 border-b border-brand-border">
+          <thead className="bg-black/10 border-b border-brand-border">
             <tr className="text-left text-xs uppercase tracking-wider text-brand-textMuted">
               <th className="px-4 py-3 font-semibold">Title</th>
               <th className="px-4 py-3 font-semibold">Category</th>

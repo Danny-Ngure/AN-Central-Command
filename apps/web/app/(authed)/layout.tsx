@@ -1,7 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { db, people, wards } from '@an/db';
-import { Navbar } from '@/components/navbar';
-import { Sidebar } from '@/components/sidebar';
+import { AutoBreadcrumbs } from '@/components/auto-breadcrumbs';
+import { Countdown } from '@/components/countdown';
+import { SiteFooter } from '@/components/site-footer';
+import { TopNav } from '@/components/top-nav';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
 
 // Route-group layout. Every page under apps/web/app/(authed)/ goes through this:
@@ -44,13 +46,26 @@ export default async function AuthedLayout({ children }: { children: React.React
     wardName = wardRows[0]?.name ?? null;
   }
 
+  // All wards — feeds the "Wards" mega-menu in the top nav (id + name only).
+  const allWards = await db
+    .select({ id: wards.id, name: wards.name })
+    .from(wards)
+    .orderBy(wards.name);
+
   return (
-    <div className="min-h-screen flex flex-col bg-black">
-      <Navbar user={{ fullName: person.fullName, role: person.role, wardName }} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
-      </div>
+    <div className="min-h-screen flex flex-col bg-brand-darkBg">
+      <TopNav user={{ fullName: person.fullName, role: person.role, wardName }} wards={allWards} />
+      {/* SRS FR-090 — hero countdown strip, full-width below the main navbar. */}
+      <Countdown />
+      <main className="flex-1 overflow-auto">
+        <div className="max-w-[1600px] mx-auto p-4 lg:p-6">
+          <AutoBreadcrumbs />
+          {children}
+        </div>
+        {/* Full-width per-page footer — the hero photo changes per route.
+            See apps/web/components/site-footer.tsx for the route → image map. */}
+        <SiteFooter />
+      </main>
     </div>
   );
 }

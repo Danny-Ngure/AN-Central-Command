@@ -1,4 +1,4 @@
-import { Countdown } from './countdown';
+import { BrandMark } from './brand';
 import { LogoutButton } from './logout-button';
 
 interface NavbarProps {
@@ -28,18 +28,11 @@ export function Navbar({ user }: NavbarProps) {
     <header className="border-b border-brand-border bg-brand-cardBg/80 backdrop-blur-md">
       <div className="flex items-center justify-between px-6 py-3 gap-4">
         <div className="flex items-center gap-4 shrink-0">
-          <div className="text-xs uppercase tracking-[0.3em] text-brand-textMuted">
-            AN Central Command
-          </div>
-          <div className="text-xs text-brand-textMuted">·</div>
-          <div className="text-xs text-brand-textMuted">
+          <BrandMark size={44} />
+          <div className="hidden lg:block text-xs text-brand-textMuted">·</div>
+          <div className="hidden lg:block text-xs text-brand-textMuted">
             Nyali Constituency
           </div>
-        </div>
-
-        {/* SRS FR-090 — persistent election countdown widget. */}
-        <div className="hidden md:flex flex-1 justify-center">
-          <Countdown />
         </div>
 
         <div className="flex items-center gap-4 shrink-0">

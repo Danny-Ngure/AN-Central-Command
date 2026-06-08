@@ -2,17 +2,17 @@
 
 import { useEffect, useState } from 'react';
 
-// Election Countdown Widget (SRS FR-090).
+// Election Countdown — HERO STRIP (SRS FR-090).
 //
-// AC-090.1 — visible on every Central Command page (mounted in components/navbar.tsx).
+// Placement: full-width strip immediately below the navbar (set in app/(authed)/layout.tsx).
+// Style:    extremely loud — huge boxed digits, urgency-tiered colour, persistent pulse.
+//
+// Calendar-month arithmetic for the months unit (walks the calendar so "1 month"
+// means "until same day-of-month next month", not "30.44 days").
+//
 // AC-090.2 — election date configurable via NEXT_PUBLIC_ELECTION_DATE env var.
 // AC-090.3 — when the date passes, displays "Election day" then "N days since election".
-//
-// Note: ticks once per second client-side. The 1Hz re-render is scoped to this single
-// small component, not the whole navbar — React only re-renders the subtree below
-// the state change, and the rest of the navbar is server-rendered.
 
-// 06:00 EAT on 9 August 2027 — polls open in Kenya.
 const DEFAULT_ELECTION_DATE = '2027-08-09T03:00:00.000Z';
 
 const ELECTION_DATE = new Date(
@@ -20,6 +20,7 @@ const ELECTION_DATE = new Date(
 );
 
 interface Parts {
+  months: number;
   days: number;
   hours: number;
   mins: number;
@@ -28,19 +29,42 @@ interface Parts {
 }
 
 function diffParts(now: Date): Parts {
-  const ms = ELECTION_DATE.getTime() - now.getTime();
-  const passed = ms <= 0;
-  const abs = Math.abs(ms);
-  const days = Math.floor(abs / 86_400_000);
-  const hours = Math.floor((abs / 3_600_000) % 24);
-  const mins = Math.floor((abs / 60_000) % 60);
-  const secs = Math.floor((abs / 1_000) % 60);
-  return { days, hours, mins, secs, passed };
+  const target = ELECTION_DATE;
+  const passed = target.getTime() <= now.getTime();
+
+  if (passed) {
+    const abs = Math.abs(target.getTime() - now.getTime());
+    return {
+      months: 0,
+      days: Math.floor(abs / 86_400_000),
+      hours: Math.floor((abs / 3_600_000) % 24),
+      mins: Math.floor((abs / 60_000) % 60),
+      secs: Math.floor((abs / 1_000) % 60),
+      passed: true,
+    };
+  }
+
+  let months =
+    (target.getUTCFullYear() - now.getUTCFullYear()) * 12 +
+    (target.getUTCMonth() - now.getUTCMonth());
+  const anchor = new Date(now);
+  anchor.setUTCMonth(anchor.getUTCMonth() + months);
+  if (anchor.getTime() > target.getTime()) {
+    months -= 1;
+    anchor.setUTCMonth(anchor.getUTCMonth() - 1);
+  }
+  const remainder = target.getTime() - anchor.getTime();
+  return {
+    months,
+    days: Math.floor(remainder / 86_400_000),
+    hours: Math.floor((remainder / 3_600_000) % 24),
+    mins: Math.floor((remainder / 60_000) % 60),
+    secs: Math.floor((remainder / 1_000) % 60),
+    passed: false,
+  };
 }
 
 export function Countdown() {
-  // null on first server render → renders a safe placeholder.
-  // useEffect populates the real value client-side and starts the ticker.
   const [parts, setParts] = useState<Parts | null>(null);
 
   useEffect(() => {
@@ -50,11 +74,11 @@ export function Countdown() {
   }, []);
 
   if (!parts) {
-    // Pre-hydration placeholder — keeps server and client markup consistent.
     return (
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-brand-textMuted font-semibold">
-        <span>Election countdown</span>
-        <span className="text-brand-textActive">—</span>
+      <div className="w-full border-b border-brand-border bg-brand-cardBg/60 py-2 flex items-center justify-center gap-3">
+        <span className="text-[11px] uppercase tracking-[0.2em] text-brand-textMuted font-bold">
+          Election countdown
+        </span>
       </div>
     );
   }
@@ -62,42 +86,112 @@ export function Countdown() {
   if (parts.passed) {
     if (parts.days === 0 && parts.hours < 24) {
       return (
-        <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-brand-cyan animate-pulse" />
-          <span className="text-xs font-bold uppercase tracking-wider text-brand-cyan">
+        <div className="w-full border-b border-brand-teal/40 bg-brand-teal/10 py-2.5 flex items-center justify-center gap-3">
+          <span className="w-2.5 h-2.5 rounded-full bg-brand-teal animate-pulse" />
+          <span className="text-base md:text-lg font-extrabold uppercase tracking-[0.2em] text-brand-teal">
             Election day
           </span>
         </div>
       );
     }
     return (
-      <div className="text-xs text-brand-textMuted">
-        {parts.days} day{parts.days === 1 ? '' : 's'} since election
+      <div className="w-full border-b border-brand-border bg-brand-cardBg/40 py-2 text-center">
+        <span className="text-sm font-bold text-brand-textActive">
+          {parts.days} day{parts.days === 1 ? '' : 's'} since election
+        </span>
       </div>
     );
   }
 
+  const tier =
+    parts.months === 0 && parts.days < 7
+      ? 'critical'
+      : parts.months === 0 && parts.days < 30
+        ? 'warning'
+        : parts.months < 6
+          ? 'active'
+          : 'calm';
+
+  // BOLD multi-colour countdown — each unit gets its own retro-sunset colour for a
+  // vibrant, campaign-rally feel. Five solid-filled cells in a fixed 5-col grid;
+  // digit size via clamp() so it's HUGE on desktop and fits a phone with no overflow.
+  // When the race gets close (<30 days) every cell goes rust + pulses for urgency.
+  const urgent = tier === 'warning' || tier === 'critical';
+  const CELLS: Array<{ value: number; unit: string; fill: string; text: string; pad?: boolean; live?: boolean }> = [
+    { value: parts.months, unit: 'Months',  fill: 'bg-brand-burnt', text: 'text-white' },
+    { value: parts.days,   unit: 'Days',     fill: 'bg-brand-gold',  text: 'text-black' },
+    { value: parts.hours,  unit: 'Hours',    fill: 'bg-brand-teal',  text: 'text-white', pad: true },
+    { value: parts.mins,   unit: 'Minutes',  fill: 'bg-brand-rust',  text: 'text-white', pad: true },
+    { value: parts.secs,   unit: 'Seconds',  fill: 'bg-brand-brown', text: 'text-white', pad: true, live: true },
+  ];
+
   return (
-    <div className="flex items-center gap-3">
-      <div className="text-[10px] uppercase tracking-wider text-brand-textMuted font-semibold">
-        Election in
-      </div>
-      <div className="flex items-center gap-1.5 text-brand-textActive font-mono text-xs">
-        <Cell value={parts.days} unit="d" />
-        <Cell value={parts.hours} unit="h" pad />
-        <Cell value={parts.mins} unit="m" pad />
-        <Cell value={parts.secs} unit="s" pad />
+    <div className="w-full border-b border-brand-border bg-gradient-to-r from-brand-burnt/10 via-brand-gold/10 to-brand-teal/10">
+      <div className="max-w-4xl mx-auto px-2 sm:px-4 py-3 md:py-5">
+        {/* Eyebrow */}
+        <div className="flex items-center justify-center gap-2 mb-2 md:mb-3">
+          <span className="w-2 h-2 rounded-full bg-brand-burnt animate-pulse" />
+          <span
+            className="font-black uppercase tracking-[0.18em] text-brand-textActive text-center"
+            style={{ fontSize: 'clamp(0.6rem, 2.2vw, 0.85rem)' }}
+          >
+            Election Countdown · 9 Aug 2027
+          </span>
+          <span className="w-2 h-2 rounded-full bg-brand-teal animate-pulse" />
+        </div>
+
+        {/* Five big cells (incl. seconds) — fixed 5-col grid never overflows. */}
+        <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5 md:gap-3">
+          {CELLS.map((c) => (
+            <Cell
+              key={c.unit}
+              value={c.value}
+              unit={c.unit}
+              fill={urgent ? 'bg-brand-rust' : c.fill}
+              text={urgent ? 'text-white' : c.text}
+              pad={c.pad}
+              live={c.live || urgent}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function Cell({ value, unit, pad }: { value: number; unit: string; pad?: boolean }) {
-  const text = pad ? String(value).padStart(2, '0') : String(value);
+function Cell({
+  value,
+  unit,
+  fill,
+  text,
+  pad,
+  live,
+}: {
+  value: number;
+  unit: string;
+  fill: string;
+  text: string;
+  pad?: boolean;
+  live?: boolean;
+}) {
+  const str = pad ? String(value).padStart(2, '0') : String(value);
+  const subtle = text === 'text-black' ? 'text-black/60' : 'text-white/80';
   return (
-    <span>
-      <span className="font-bold tabular-nums">{text}</span>
-      <span className="text-brand-textMuted ml-0.5">{unit}</span>
-    </span>
+    <div
+      className={`min-w-0 rounded-xl md:rounded-2xl ${fill} shadow-lg flex flex-col items-center justify-center px-0.5 py-2 sm:py-3 md:py-4`}
+    >
+      <span
+        className={`font-black tabular-nums leading-none ${text} ${live ? 'animate-pulse' : ''}`}
+        style={{ fontSize: 'clamp(1.5rem, 8vw, 4.5rem)' }}
+      >
+        {str}
+      </span>
+      <span
+        className={`font-bold uppercase tracking-wider ${subtle} mt-1 md:mt-2`}
+        style={{ fontSize: 'clamp(0.5rem, 1.7vw, 0.72rem)' }}
+      >
+        {unit}
+      </span>
+    </div>
   );
 }

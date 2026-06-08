@@ -1,172 +1,629 @@
-import { pollingStations, wards } from '@an/db';
-import { eq } from 'drizzle-orm';
+import Link from 'next/link';
+import { sql } from 'drizzle-orm';
+import { voters } from '@an/db';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
 import { withRlsTx } from '@/lib/api';
+import { HorizontalBarChart } from '@/components/charts/horizontal-bar';
+import { GroupedBarChart } from '@/components/charts/grouped-bar';
+import { BarChart } from '@/components/charts/bar-chart';
+import { Pie } from '@/components/charts/pie';
+import {
+  HISTORICAL_ELECTIONS,
+  WARD_PROFILES,
+  CYCLE_TRENDS,
+  type HistoricalElection,
+  type HistoricalWardResult,
+} from '@/data/elections-history';
+import { CURRENT_POLLS, computePollAverage } from '@/data/current-polls';
 
-// Pollings & Analysis (SRS FR-070 to FR-072).
+// /analytics?tab=pollings|history|2013|2017|2022|analysis
 //
-// Full deliverable includes electoral history charts (2013/2017/2022), demographics,
-// and current race intelligence. This first version surfaces the raw polling station
-// table — historical turnouts and 2022 margins are the rawest signal a strategist
-// needs before charts and heatmaps land in a follow-up commit.
+// Tabs:
+//   • pollings    (default) — Swiss Poll Int. + Politrack + cross-poll average
+//   • history     — Historical overview (winners + share trend + top-3 trend)
+//   • 2013, 2017, 2022 — Per-cycle deep dive (candidates / per-ward / summary)
+//   • analysis    — Strategic ward profiles + demographic cross-check
+//
+// All charts are constrained max-w-md/xl/2xl so they read like dashboard charts
+// rather than full-page banners. Each chart has a small commentary line below it.
 
-export default async function AnalyticsPage() {
+type Tab = 'pollings' | 'history' | '2013' | '2017' | '2022' | 'analysis';
+
+const COLORS = {
+  ours:    '#ff6600',
+  rival1:  '#dc2626',
+  rival2:  '#0d4c5c',
+  neutral: '#64748b',
+  teal:    '#025e73',
+  sky:     '#00ccff',
+  aqua:    '#11b6cb',
+  amber:   '#e26d28',
+  emerald: '#10b981',
+};
+
+interface PageProps {
+  searchParams: { tab?: string };
+}
+
+export default async function AnalyticsPage({ searchParams }: PageProps) {
   const claims = await getServerAuthOrRedirect();
+  const tab: Tab = (['pollings', 'history', '2013', '2017', '2022', 'analysis'].includes(searchParams.tab ?? '')
+    ? searchParams.tab
+    : 'pollings') as Tab;
 
-  const data = await withRlsTx(claims, async (tx) => {
-    const stationRows = await tx
-      .select({
-        id: pollingStations.id,
-        iebcCode: pollingStations.iebcCode,
-        name: pollingStations.name,
-        wardId: pollingStations.wardId,
-        registeredVoters: pollingStations.registeredVoters,
-        turnout2013: pollingStations.turnout2013,
-        turnout2017: pollingStations.turnout2017,
-        turnout2022: pollingStations.turnout2022,
-        margin2022: pollingStations.margin2022,
-        targetTurnout: pollingStations.targetTurnout,
+  // Only load voter demographics for the analysis tab.
+  const ourDemo = tab === 'analysis'
+    ? await withRlsTx(claims, async (tx) => {
+        const [row] = (await tx.execute(sql`
+          SELECT
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE gender = 'M')::int AS men,
+            COUNT(*) FILTER (WHERE gender = 'F')::int AS women,
+            COUNT(*) FILTER (WHERE date_of_birth IS NOT NULL AND date_part('year', age(date_of_birth)) BETWEEN 18 AND 24)::int AS a_18_24,
+            COUNT(*) FILTER (WHERE date_of_birth IS NOT NULL AND date_part('year', age(date_of_birth)) BETWEEN 25 AND 34)::int AS a_25_34,
+            COUNT(*) FILTER (WHERE date_of_birth IS NOT NULL AND date_part('year', age(date_of_birth)) BETWEEN 35 AND 44)::int AS a_35_44,
+            COUNT(*) FILTER (WHERE date_of_birth IS NOT NULL AND date_part('year', age(date_of_birth)) BETWEEN 45 AND 54)::int AS a_45_54,
+            COUNT(*) FILTER (WHERE date_of_birth IS NOT NULL AND date_part('year', age(date_of_birth)) >= 55)::int AS a_55_plus,
+            COUNT(*) FILTER (WHERE phone IS NOT NULL)::int AS with_phone
+          FROM voters
+          WHERE consent_withdrawn_at IS NULL
+        `)) as any[];
+        return row ?? null;
       })
-      .from(pollingStations)
-      .orderBy(pollingStations.iebcCode);
-
-    const wardRows = await tx
-      .select({
-        id: wards.id,
-        name: wards.name,
-        registeredVoters: wards.registeredVoters,
-      })
-      .from(wards)
-      .orderBy(wards.name);
-
-    const wardMap = new Map(wardRows.map((w) => [w.id, w.name]));
-
-    // Ward-level turnout averages across the three cycles.
-    const wardSummary = wardRows.map((w) => {
-      const stations = stationRows.filter((s) => s.wardId === w.id);
-      const avg = (key: 'turnout2013' | 'turnout2017' | 'turnout2022') => {
-        const vals = stations.map((s) => s[key]).filter((v): v is number => v != null);
-        return vals.length === 0 ? null : Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-      };
-      const totalMargin2022 = stations.reduce((sum, s) => sum + (s.margin2022 ?? 0), 0);
-      return {
-        ...w,
-        turnout2013: avg('turnout2013'),
-        turnout2017: avg('turnout2017'),
-        turnout2022: avg('turnout2022'),
-        stationCount: stations.length,
-        totalMargin2022,
-      };
-    });
-
-    return { stationRows, wardMap, wardSummary };
-  });
+    : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-brand-textActive">Pollings & Analysis</h1>
+        <h1 className="text-2xl font-bold text-brand-textActive">Pollings &amp; Analysis</h1>
         <p className="text-sm text-brand-textMuted">
-          Historical electoral performance and 2027 targets. Heatmaps and demographic
-          overlays arrive in a subsequent commit.
+          Current race standing, historical IEBC results (2013-2022), per-ward swing
+          analysis, and demographic cross-check against our imported voter register.
         </p>
       </header>
 
-      {/* Ward-level summary */}
-      <section className="space-y-2">
-        <h2 className="text-xs font-semibold text-brand-textMuted uppercase tracking-wider">
-          Ward summary
-        </h2>
-        <div className="rounded-xl border border-brand-border bg-brand-cardBg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-black/40 border-b border-brand-border">
-              <tr className="text-left text-xs uppercase tracking-wider text-brand-textMuted">
-                <th className="px-4 py-3 font-semibold">Ward</th>
-                <th className="px-4 py-3 font-semibold text-right">Voters</th>
-                <th className="px-4 py-3 font-semibold text-right">Stations</th>
-                <th className="px-4 py-3 font-semibold text-right">2013</th>
-                <th className="px-4 py-3 font-semibold text-right">2017</th>
-                <th className="px-4 py-3 font-semibold text-right">2022</th>
-                <th className="px-4 py-3 font-semibold text-right">2022 margin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.wardSummary.map((w) => (
-                <tr key={w.id} className="border-b border-brand-border/40">
-                  <td className="px-4 py-3 font-medium text-brand-textActive">{w.name}</td>
-                  <td className="px-4 py-3 text-right text-brand-textMuted">
-                    {w.registeredVoters?.toLocaleString() ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right text-brand-textMuted">{w.stationCount}</td>
-                  <td className="px-4 py-3 text-right text-brand-textMuted">
-                    {w.turnout2013 != null ? `${w.turnout2013}%` : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right text-brand-textMuted">
-                    {w.turnout2017 != null ? `${w.turnout2017}%` : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right text-brand-textMuted">
-                    {w.turnout2022 != null ? `${w.turnout2022}%` : '—'}
-                  </td>
-                  <td className={`px-4 py-3 text-right font-semibold ${w.totalMargin2022 >= 0 ? 'text-emerald-400' : 'text-brand-danger'}`}>
-                    {w.totalMargin2022 >= 0 ? '+' : ''}{w.totalMargin2022.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {/* Tab nav */}
+      <nav className="flex gap-1 border-b border-brand-border overflow-x-auto">
+        <TabLink href="/analytics" active={tab === 'pollings'}>Pollings</TabLink>
+        <TabLink href="/analytics?tab=history" active={tab === 'history'}>Historical results</TabLink>
+        <TabLink href="/analytics?tab=2013" active={tab === '2013'}>2013</TabLink>
+        <TabLink href="/analytics?tab=2017" active={tab === '2017'}>2017</TabLink>
+        <TabLink href="/analytics?tab=2022" active={tab === '2022'}>2022</TabLink>
+        <TabLink href="/analytics?tab=analysis" active={tab === 'analysis'}>Analysis &amp; demographics</TabLink>
+      </nav>
 
-      {/* Polling station table */}
-      <section className="space-y-2">
-        <h2 className="text-xs font-semibold text-brand-textMuted uppercase tracking-wider">
-          Polling stations ({data.stationRows.length})
-        </h2>
-        <div className="rounded-xl border border-brand-border bg-brand-cardBg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-black/40 border-b border-brand-border">
-              <tr className="text-left text-xs uppercase tracking-wider text-brand-textMuted">
-                <th className="px-4 py-3 font-semibold">IEBC</th>
-                <th className="px-4 py-3 font-semibold">Station</th>
-                <th className="px-4 py-3 font-semibold">Ward</th>
-                <th className="px-4 py-3 font-semibold text-right">Voters</th>
-                <th className="px-4 py-3 font-semibold text-right">13/17/22</th>
-                <th className="px-4 py-3 font-semibold text-right">2022 margin</th>
-                <th className="px-4 py-3 font-semibold text-right">2027 target</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.stationRows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-brand-textMuted">
-                    No stations visible.
-                  </td>
-                </tr>
-              ) : (
-                data.stationRows.map((s) => (
-                  <tr key={s.id} className="border-b border-brand-border/40 hover:bg-black/20 transition">
-                    <td className="px-4 py-3 text-brand-textMuted font-mono text-xs">{s.iebcCode}</td>
-                    <td className="px-4 py-3 text-brand-textActive">{s.name}</td>
-                    <td className="px-4 py-3 text-brand-textMuted">{data.wardMap.get(s.wardId) ?? '—'}</td>
-                    <td className="px-4 py-3 text-right text-brand-textMuted">
-                      {s.registeredVoters.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-right text-brand-textMuted text-xs">
-                      {s.turnout2013 ?? '—'}% / {s.turnout2017 ?? '—'}% / {s.turnout2022 ?? '—'}%
-                    </td>
-                    <td className={`px-4 py-3 text-right font-semibold ${(s.margin2022 ?? 0) >= 0 ? 'text-emerald-400' : 'text-brand-danger'}`}>
-                      {(s.margin2022 ?? 0) >= 0 ? '+' : ''}{s.margin2022?.toLocaleString() ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right text-brand-cyan font-semibold">
-                      {s.targetTurnout ?? '—'}%
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {tab === 'pollings'  && <TabPollings />}
+      {tab === 'history'   && <TabHistory />}
+      {tab === '2013'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2013)!} />}
+      {tab === '2017'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2017)!} />}
+      {tab === '2022'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2022)!} />}
+      {tab === 'analysis'  && <TabAnalysis demo={ourDemo} />}
     </div>
   );
+}
+
+// ─── TAB: Pollings ─────────────────────────────────────────────────────────────
+
+function TabPollings() {
+  const pollAvg = computePollAverage();
+  const leadAvg = pollAvg[0];
+  const runnerUpAvg = pollAvg[1];
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {CURRENT_POLLS.map((p) => (
+          <PollCard key={p.source} poll={p} />
+        ))}
+      </div>
+
+      {/* Cross-poll average — donut highlighting Alfayo's average share, bars beside */}
+      <ChartCard title={`Cross-poll average (${CURRENT_POLLS.length} polls)`} subtitle="unweighted mean across pollsters">
+        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-6 items-center">
+          {/* Donut on the left */}
+          <div className="flex flex-col items-center">
+            <Pie
+              donut
+              size={170}
+              showLegend={false}
+              centerText={`${leadAvg?.averagePct.toFixed(0)}%`}
+              centerSubText={leadAvg?.name.split(' ')[0]}
+              data={pollAvg.map((c) => ({
+                label: c.name,
+                value: c.averagePct,
+                color: c.ourCandidate ? COLORS.ours : c.averagePct > 10 ? COLORS.rival1 : COLORS.rival2,
+              }))}
+            />
+            <div className="text-[10px] uppercase tracking-wider text-brand-textMuted mt-2 font-bold">
+              {leadAvg?.name} avg
+            </div>
+          </div>
+          {/* Bars on the right */}
+          <div>
+            <HorizontalBarChart
+              bars={pollAvg.map((c) => ({
+                label: c.name,
+                value: c.averagePct,
+                color: c.ourCandidate ? COLORS.ours : c.averagePct > 10 ? COLORS.rival1 : COLORS.rival2,
+                highlight: c.ourCandidate,
+                sublabel: c.spread > 0 ? `±${(c.spread / 2).toFixed(1)} pt spread` : undefined,
+              }))}
+            />
+          </div>
+        </div>
+        <Caption>
+          <strong>Strategic read:</strong>{' '}
+          Alfayo is polling <strong>{leadAvg?.averagePct.toFixed(1)}%</strong> on average — a{' '}
+          <strong>{((leadAvg?.averagePct ?? 0) - (runnerUpAvg?.averagePct ?? 0)).toFixed(1)}-point</strong>{' '}
+          lead over {runnerUpAvg?.name}. Focus shifts from persuasion to{' '}
+          <strong>turnout protection</strong> (especially Kongowea) and the undecided segment.
+        </Caption>
+      </ChartCard>
+    </div>
+  );
+}
+
+// ─── TAB: Historical overview ─────────────────────────────────────────────────
+
+function TabHistory() {
+  return (
+    <div className="space-y-5">
+      {/* Winner cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {HISTORICAL_ELECTIONS.map((e) => {
+          const trend = CYCLE_TRENDS.find((t) => t.year === e.year)!;
+          const winner = e.candidates.find((c) => c.isWinner)!;
+          return (
+            <div key={e.year} className="rounded-xl border border-brand-border bg-brand-cardBg p-4">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-brand-textMuted">
+                {e.year} winner
+              </div>
+              <div className="text-base font-extrabold text-brand-textActive mt-1">{winner.name}</div>
+              <div className="text-xs text-brand-textMuted">{winner.party}</div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                <Mini label="Votes" value={winner.votes.toLocaleString()} />
+                <Mini label="Share" value={`${trend.winnerShare.toFixed(1)}%`} />
+                <Mini label="Total valid" value={trend.totalValidVotes.toLocaleString()} />
+                <Mini label="Margin" value={trend.winningMargin.toLocaleString()} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <ChartCard title="Winner vote share by cycle" subtitle="% of total valid votes captured by the eventual MP">
+        {/* Each cycle gets its own brand colour so the year-over-year growth pops. */}
+        <BarChart
+          yAxisLabel="Winner share %"
+          className="max-w-lg"
+          bars={[
+            { label: '2013', value: CYCLE_TRENDS[0]!.winnerShare, color: '#0d4c5c', hint: `${CYCLE_TRENDS[0]!.winnerVotes.toLocaleString()} votes` },
+            { label: '2017', value: CYCLE_TRENDS[1]!.winnerShare, color: '#00ccff', hint: `${CYCLE_TRENDS[1]!.winnerVotes.toLocaleString()} votes` },
+            { label: '2022', value: CYCLE_TRENDS[2]!.winnerShare, color: '#ff6600', hint: `${CYCLE_TRENDS[2]!.winnerVotes.toLocaleString()} votes` },
+          ]}
+        />
+        <Caption>
+          Winners' share climbed steadily across cycles — 34% (2013) → 49% (2017) → 60% (2022).
+          The race has become <strong>less fragmented over time</strong>; 2027 likely continues that pattern
+          if the top 2-3 candidates consolidate.
+        </Caption>
+      </ChartCard>
+
+      <ChartCard title="Top 3 candidates by cycle" subtitle="raw vote totals (winner / runner-up / 3rd)">
+        <GroupedBarChart
+          yAxisLabel="Votes"
+          className="max-w-5xl"
+          groups={['2013', '2017', '2022']}
+          series={[
+            { label: 'Winner',    color: COLORS.teal,  values: CYCLE_TRENDS.map((t) => t.winnerVotes) },
+            { label: 'Runner-up', color: COLORS.amber, values: CYCLE_TRENDS.map((t) => t.runnerUpVotes) },
+            {
+              label: '3rd place',
+              color: COLORS.aqua,
+              values: HISTORICAL_ELECTIONS.map((e) => e.candidates[2]?.votes ?? 0),
+            },
+          ]}
+        />
+        <Caption>
+          Total turnout grew each cycle. Mohamed Ali (2017+ winner) more than doubled the runner-up
+          on every count — that dominance is unusual and is what the current opinion polls suggest is shifting.
+        </Caption>
+      </ChartCard>
+    </div>
+  );
+}
+
+// ─── TAB: Per-cycle (2013 / 2017 / 2022) ──────────────────────────────────────
+
+function TabCycle({ election }: { election: HistoricalElection }) {
+  const trend = CYCLE_TRENDS.find((t) => t.year === election.year)!;
+  const winner = election.candidates.find((c) => c.isWinner)!;
+  const topN = election.candidates.slice(0, 8);
+  const wardNames: (keyof HistoricalWardResult)[] = [
+    'Frere_Town', 'Kongowea', 'Mkomani', 'Ziwa_La_Ngombe', 'Kadzandani',
+  ];
+  const wardLabels: Record<keyof HistoricalWardResult, string> = {
+    Frere_Town: 'Frere Town',
+    Kongowea: 'Kongowea',
+    Mkomani: 'Mkomani',
+    Ziwa_La_Ngombe: "Ziwa La Ng'ombe",
+    Kadzandani: 'Kadzandani',
+  };
+  const runnerUp = election.candidates.find((c) => !c.isWinner)!;
+
+  return (
+    <div className="space-y-5">
+      {/* Headline strip */}
+      <div className="rounded-xl border border-brand-border bg-brand-cardBg p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Mini label={`${election.year} winner`} value={winner.name} />
+        <Mini label="Party" value={winner.party} />
+        <Mini label="Votes" value={winner.votes.toLocaleString()} />
+        <Mini label="Share" value={`${trend.winnerShare.toFixed(1)}%`} />
+      </div>
+
+      {/* Top candidates horizontal bars */}
+      <ChartCard title={`${election.year} candidates — vote share`} subtitle="full slate (top 8 by votes)">
+        <div className="max-w-5xl">
+          <HorizontalBarChart
+            max={Math.max(50, Math.ceil((winner.votes / trend.totalValidVotes) * 100 / 5) * 5)}
+            bars={topN.map((c, i) => ({
+              label: c.name,
+              value: (c.votes / trend.totalValidVotes) * 100,
+              color: c.isWinner ? COLORS.teal : i === 1 ? COLORS.amber : i === 2 ? COLORS.aqua : COLORS.neutral,
+              highlight: c.isWinner,
+              sublabel: `${c.party} · ${c.votes.toLocaleString()} votes`,
+            }))}
+          />
+        </div>
+        <Caption>
+          <strong>{winner.name}</strong> ({winner.party}) won with {trend.winnerShare.toFixed(1)}%;{' '}
+          runner-up <strong>{runnerUp.name}</strong> ({runnerUp.party}) on {trend.runnerUpShare.toFixed(1)}%.
+          Margin: <strong>{trend.winningMargin.toLocaleString()}</strong> votes.
+        </Caption>
+      </ChartCard>
+
+      {/* Per-ward grouped bar */}
+      <ChartCard
+        title={`${election.year} ward-by-ward (approx)`}
+        subtitle="winner · runner-up · others — from the PDF appendix"
+      >
+        <GroupedBarChart
+          yAxisLabel="Votes (~)"
+          className="max-w-5xl"
+          groups={wardNames.map((k) => wardLabels[k])}
+          series={[
+            {
+              label: `${winner.party} (winner)`,
+              color: COLORS.teal,
+              values: wardNames.map((k) => election.perWard[k].winner),
+            },
+            {
+              label: `${runnerUp.party} (runner-up)`,
+              color: COLORS.amber,
+              values: wardNames.map((k) => election.perWard[k].runnerUp),
+            },
+            {
+              label: 'Others',
+              color: COLORS.neutral,
+              values: wardNames.map((k) => election.perWard[k].others),
+            },
+          ]}
+        />
+        <Caption>
+          {ward2022Note(election.year, election.perWard)}
+        </Caption>
+      </ChartCard>
+
+      {/* Cycle commentary from PDF */}
+      <ChartCard title={`${election.year} summary`} subtitle="from the IEBC results PDF">
+        <ul className="text-sm text-brand-textBody space-y-1">
+          {election.summary.map((s, i) => (
+            <li key={i} className="flex gap-2">
+              <span className="text-brand-orangeBright">›</span>
+              <span>{s}</span>
+            </li>
+          ))}
+        </ul>
+      </ChartCard>
+
+      {/* Donut: winner's contribution by ward */}
+      <ChartCard
+        title={`${election.year} — where the winner's votes came from`}
+        subtitle="approximate ward share of winner's total"
+      >
+        <Pie
+          donut
+          size={180}
+          centerText={`${winner.votes.toLocaleString()}`}
+          centerSubText="total votes"
+          data={wardNames.map((k, i) => ({
+            label: wardLabels[k],
+            value: election.perWard[k].winner,
+            color: [COLORS.teal, COLORS.amber, COLORS.aqua, COLORS.sky, COLORS.emerald][i] ?? COLORS.neutral,
+          }))}
+        />
+        <Caption>
+          The donut shows roughly which wards built the {election.year} winner's coalition.
+          Kongowea is the perennial vote powerhouse in every cycle.
+        </Caption>
+      </ChartCard>
+    </div>
+  );
+}
+
+// ─── TAB: Analysis & Demographics ─────────────────────────────────────────────
+
+function TabAnalysis({ demo }: { demo: any | null }) {
+  const total       = Number(demo?.total ?? 0);
+  const ourMen      = Number(demo?.men ?? 0);
+  const ourWomen    = Number(demo?.women ?? 0);
+  const ourMenPct   = total > 0 ? (ourMen / total) * 100 : 0;
+  const ourWomenPct = total > 0 ? (ourWomen / total) * 100 : 0;
+  const ourAge: Record<string, number> = {
+    '18-24': total > 0 ? (Number(demo?.a_18_24 ?? 0) / total) * 100 : 0,
+    '25-34': total > 0 ? (Number(demo?.a_25_34 ?? 0) / total) * 100 : 0,
+    '35-44': total > 0 ? (Number(demo?.a_35_44 ?? 0) / total) * 100 : 0,
+    '45-54': total > 0 ? (Number(demo?.a_45_54 ?? 0) / total) * 100 : 0,
+    '55+':   total > 0 ? (Number(demo?.a_55_plus ?? 0) / total) * 100 : 0,
+  };
+  const swissSample = CURRENT_POLLS[0];
+
+  return (
+    <div className="space-y-5">
+      {/* Strategic ward profiles */}
+      <ChartCard title="Strategic ward profiles" subtitle="behaviour patterns 2013-2022 — turnout-priority guidance for 2027">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {WARD_PROFILES.map((w) => (
+            <div key={w.name} className="rounded-lg border border-brand-border bg-black/10 p-3">
+              <div className="flex items-baseline justify-between gap-2 mb-1">
+                <h3 className="text-sm font-bold text-brand-textActive">{w.name}</h3>
+                <span className={behaviourBadgeClass(w.behaviour)}>{w.oneLiner}</span>
+              </div>
+              <p className="text-xs text-brand-textBody leading-relaxed">{w.note}</p>
+            </div>
+          ))}
+        </div>
+      </ChartCard>
+
+      {/* Demographic cross-check — gender */}
+      <ChartCard
+        title="Gender — our register vs Swiss Poll sample"
+        subtitle={`${total.toLocaleString()} voters vs n=${swissSample?.sampleSize}`}
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-brand-textMuted mb-1 text-center">
+              Our register
+            </div>
+            <Pie
+              size={140}
+              data={[
+                { label: 'Men',   value: ourMen,   color: COLORS.sky },
+                { label: 'Women', value: ourWomen, color: COLORS.ours },
+              ]}
+            />
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-brand-textMuted mb-1 text-center">
+              Swiss sample
+            </div>
+            {swissSample?.demographics?.gender && (
+              <Pie
+                size={140}
+                data={[
+                  { label: 'Men',   value: swissSample.demographics.gender.men,   color: COLORS.sky },
+                  { label: 'Women', value: swissSample.demographics.gender.women, color: COLORS.ours },
+                ]}
+              />
+            )}
+          </div>
+        </div>
+        <Caption>
+          Register: <strong>{ourMenPct.toFixed(1)}% men / {ourWomenPct.toFixed(1)}% women.</strong>{' '}
+          Swiss sample:{' '}
+          <strong>
+            {(((swissSample?.demographics?.gender?.men ?? 0) /
+              ((swissSample?.demographics?.gender?.men ?? 0) + (swissSample?.demographics?.gender?.women ?? 1))) * 100).toFixed(1)}% men.
+          </strong>{' '}
+          Both samples roughly mirror each other — the published poll is gender-representative.
+        </Caption>
+      </ChartCard>
+
+      {/* Age bands */}
+      <ChartCard
+        title="Age bands — our register vs Swiss sample"
+        subtitle="% of total in each band"
+      >
+        <GroupedBarChart
+          yAxisLabel="% of sample"
+          className="max-w-5xl"
+          groups={['18-24', '25-34', '35-44', '45-54', '55+']}
+          series={[
+            {
+              label: 'Our register',
+              color: COLORS.aqua,
+              values: [ourAge['18-24']!, ourAge['25-34']!, ourAge['35-44']!, ourAge['45-54']!, ourAge['55+']!],
+            },
+            {
+              label: 'Swiss sample',
+              color: COLORS.ours,
+              values: [
+                swissSample?.demographics?.ageGroups?.['18-24'] ?? 0,
+                swissSample?.demographics?.ageGroups?.['25-34'] ?? 0,
+                swissSample?.demographics?.ageGroups?.['35-44'] ?? 0,
+                swissSample?.demographics?.ageGroups?.['45-54'] ?? 0,
+                swissSample?.demographics?.ageGroups?.['55+']   ?? 0,
+              ],
+            },
+          ]}
+        />
+        <Caption>
+          The Swiss sample is <strong>heavily 25-34 ({swissSample?.demographics?.ageGroups?.['25-34']}%)</strong>;
+          our voter register is more evenly spread. If Alfayo's lead is concentrated in that band,
+          real-world turnout among older voters becomes the decisive 2027 swing factor.
+        </Caption>
+      </ChartCard>
+
+      {/* Our register age donut */}
+      <ChartCard title="Our voter register — age distribution" subtitle="from the imported IEBC voter list">
+        <Pie
+          donut
+          size={180}
+          centerText={total.toLocaleString()}
+          centerSubText="voters"
+          data={[
+            { label: '18-24',  value: Number(demo?.a_18_24 ?? 0),   color: '#0d4c5c' },
+            { label: '25-34',  value: Number(demo?.a_25_34 ?? 0),   color: '#025e73' },
+            { label: '35-44',  value: Number(demo?.a_35_44 ?? 0),   color: '#0891a8' },
+            { label: '45-54',  value: Number(demo?.a_45_54 ?? 0),   color: '#00ccff' },
+            { label: '55+',    value: Number(demo?.a_55_plus ?? 0), color: '#ff6600' },
+          ]}
+        />
+        <Caption>
+          Real composition of who is actually on the roll. Compare against the campaign's actual
+          contact lists — any band substantially under-reached should drive door-to-door priority.
+        </Caption>
+      </ChartCard>
+    </div>
+  );
+}
+
+// ─── Helpers / shared subcomponents ───────────────────────────────────────────
+
+function TabLink({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className={[
+        'px-3 py-2 text-xs md:text-sm font-semibold border-b-2 -mb-px transition whitespace-nowrap',
+        active
+          ? 'border-brand-orangeBright text-brand-textActive'
+          : 'border-transparent text-brand-textMuted hover:text-brand-textActive hover:border-brand-border',
+      ].join(' ')}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function ChartCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-brand-border bg-brand-cardBg p-4 space-y-3">
+      <div>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-brand-textActive">{title}</h3>
+        {subtitle && <p className="text-[10px] text-brand-textMuted mt-0.5">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Caption({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-xs text-brand-textBody leading-relaxed border-t border-brand-border/40 pt-2">
+      {children}
+    </p>
+  );
+}
+
+function Mini({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-sm font-bold text-brand-textActive tabular-nums">{value}</div>
+      <div className="text-[10px] uppercase tracking-wider text-brand-textMuted">{label}</div>
+    </div>
+  );
+}
+
+function PollCard({ poll }: { poll: typeof CURRENT_POLLS[number] }) {
+  const dt = new Date(poll.publishedAt).toLocaleDateString('en-KE', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  });
+  const leader = poll.candidates.find((c) => c.ourCandidate) ?? poll.candidates[0]!;
+  // Pie data — include the candidates + Undecided slice so the whole 100% accounts.
+  const pieData = [
+    ...poll.candidates.map((c) => ({
+      label: c.name,
+      value: c.percent,
+      color: c.ourCandidate ? COLORS.ours : c.percent > 10 ? COLORS.rival1 : c.percent > 2 ? COLORS.aqua : COLORS.rival2,
+    })),
+    ...(poll.undecidedPct ? [{ label: 'Undecided', value: poll.undecidedPct, color: COLORS.neutral }] : []),
+    ...(poll.othersPct ? [{ label: 'Others', value: poll.othersPct, color: '#475569' }] : []),
+  ];
+
+  return (
+    <div className="rounded-xl border border-brand-border bg-brand-cardBg p-4 space-y-4">
+      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+        <div>
+          <h3 className="text-sm font-bold text-brand-textActive">{poll.source}</h3>
+          <div className="text-[10px] text-brand-textMuted">{dt}</div>
+        </div>
+        <div className="text-right text-[10px] text-brand-textMuted">
+          {poll.sampleSize && <div>n = {poll.sampleSize.toLocaleString()}</div>}
+          {poll.marginErrorPct && <div>±{poll.marginErrorPct}% · {poll.confidenceLevelPct}% CL</div>}
+        </div>
+      </div>
+
+      {/* Donut + horizontal bars side-by-side */}
+      <div className="grid grid-cols-[150px_1fr] gap-4 items-center">
+        <div className="flex flex-col items-center">
+          <Pie
+            donut
+            size={140}
+            showLegend={false}
+            centerText={`${leader.percent}%`}
+            centerSubText={leader.name.split(' ')[0]?.toUpperCase()}
+            data={pieData}
+          />
+        </div>
+        <div>
+          <HorizontalBarChart
+            bars={poll.candidates.map((c) => ({
+              label: c.name,
+              value: c.percent,
+              color: c.ourCandidate ? COLORS.ours : c.percent > 10 ? COLORS.rival1 : COLORS.rival2,
+              highlight: c.ourCandidate,
+            }))}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-baseline justify-between text-[10px] text-brand-textMuted pt-2 border-t border-brand-border/50">
+        {poll.undecidedPct !== undefined && <span>Undecided: <strong className="text-brand-textBody">{poll.undecidedPct}%</strong></span>}
+        {poll.othersPct !== undefined && <span>Others: <strong className="text-brand-textBody">{poll.othersPct}%</strong></span>}
+      </div>
+    </div>
+  );
+}
+
+function behaviourBadgeClass(b: string): string {
+  const base = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded';
+  switch (b) {
+    case 'powerhouse':    return `${base} bg-brand-orangeBright/20 text-brand-orangeBright`;
+    case 'swing':         return `${base} bg-brand-warning/20 text-brand-warning`;
+    case 'odm_leaning':   return `${base} bg-brand-danger/20 text-brand-danger`;
+    case 'mixed':         return `${base} bg-brand-aqua/20 text-brand-aqua`;
+    case 'stable_middle': return `${base} bg-brand-tealBlue/20 text-brand-skyBlue`;
+    default:              return base;
+  }
+}
+
+function ward2022Note(year: number, perWard: HistoricalWardResult): string {
+  if (year === 2022) {
+    return `Strongest UDA ward: Kongowea (${perWard.Kongowea.winner.toLocaleString()} votes). Most competitive margins: Frere Town & Mkomani. ODM held best in Ziwa La Ng'ombe relatively.`;
+  }
+  if (year === 2017) {
+    return `Mohamed Ali (Independent) dominated all five wards; Kongowea gave him the largest margin (${perWard.Kongowea.winner.toLocaleString()} - ${perWard.Kongowea.runnerUp.toLocaleString()} = ${(perWard.Kongowea.winner - perWard.Kongowea.runnerUp).toLocaleString()} vote lead).`;
+  }
+  if (year === 2013) {
+    return `Kadzandani actually flipped — Shahbal (URP) edged Awiti (WDM-K) here. Awiti won the constituency on Frere Town + Kongowea strength.`;
+  }
+  return '';
 }

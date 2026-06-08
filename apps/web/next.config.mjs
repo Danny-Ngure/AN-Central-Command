@@ -10,6 +10,20 @@ const nextConfig = {
 
   reactStrictMode: true,
 
+  // Never let browsers / the Cloudflare tunnel serve stale pages — always fetch
+  // fresh from the server. Versioned assets under /_next/static + uploaded photos
+  // stay cacheable; only HTML/RSC documents are no-store.
+  async headers() {
+    return [
+      {
+        source: '/((?!_next/static|_next/image|team-photos|favicon).*)',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, max-age=0, must-revalidate' },
+        ],
+      },
+    ];
+  },
+
   // serverComponentsExternalPackages above doesn't propagate through transpilePackages.
   // When webpack walks into @an/auth (transpiled) and sees `import '@node-rs/argon2'`,
   // it would try to bundle the .node binary. Mark these as webpack externals on the

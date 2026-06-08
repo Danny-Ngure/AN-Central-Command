@@ -77,7 +77,7 @@ export default async function EnrollTotpPage({ searchParams }: PageProps) {
               <div className="text-[10px] uppercase tracking-wider text-brand-textMuted">
                 Manual entry key
               </div>
-              <code className="text-xs text-brand-textActive bg-black border border-brand-border rounded px-2 py-1 inline-block break-all">
+              <code className="text-xs text-brand-textActive bg-brand-field border border-brand-border rounded px-2 py-1 inline-block break-all">
                 {secret}
               </code>
             </div>

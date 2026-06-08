@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Minimal ANHF-coloured fallback. The real logo lives at /logo.png — this
+       file only renders if LogoImg's primary src 404s, which shouldn't happen
+       in production. Kept very small (no embedded fonts, no gradients). -->
+  <rect width="100" height="100" rx="20" fill="#025e73"/>
+  <polygon points="50,18 82,72 18,72" fill="#ff6600"/>
+  <polygon points="50,30 72,66 28,66" fill="#025e73"/>
+  <polygon points="50,40 64,62 36,62" fill="#00ccff"/>
+  <rect x="34" y="78" width="32" height="14" rx="3" fill="none" stroke="#025e73" stroke-width="2"/>
+</svg>

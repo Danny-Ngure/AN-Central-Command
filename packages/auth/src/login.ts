@@ -31,6 +31,16 @@ const ROLES_REQUIRING_2FA: ReadonlySet<string> = new Set([
   'tech_lead',
 ]);
 
+// DEV / DEMO ESCAPE HATCH — these three super-users skip the 2FA wall and log
+// in with just a password while the TOTP enrolment UI is still being built.
+// Identity-stable by full_name (phone numbers can rotate). Remove this list
+// before production cutover so SRS BR-001.2 is enforced for everyone.
+const SUPER_USERS_BYPASS_2FA: ReadonlySet<string> = new Set([
+  'Alfayo Nelson',
+  'Benson Imoli',
+  'Dan Ngure',
+]);
+
 // SRS BR-001.3: session TTLs.
 const SESSION_TTL_WEB_SECONDS = 24 * 60 * 60;
 const SESSION_TTL_MOBILE_SECONDS = 7 * 24 * 60 * 60;
@@ -139,8 +149,12 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     return { ok: false, code: 'AUTH_INVALID_CREDENTIALS' };
   }
 
-  // (6) 2FA check.
-  if (ROLES_REQUIRING_2FA.has(person.role)) {
+  // (6) 2FA check. Skipped entirely for the SUPER_USERS_BYPASS_2FA names
+  // defined above — see comment there for revert instructions.
+  if (
+    ROLES_REQUIRING_2FA.has(person.role) &&
+    !SUPER_USERS_BYPASS_2FA.has(person.fullName)
+  ) {
     if (!cred.totpSecret) {
       // SRS AC-001.4 — force enrolment on next login. Issue a short-lived token
       // that proves the user passed password verification; the enrollment flow

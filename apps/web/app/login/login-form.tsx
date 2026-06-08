@@ -72,7 +72,7 @@ export function LoginForm() {
           value={phoneOrEmail}
           onChange={(e) => setPhoneOrEmail(e.target.value)}
           placeholder="+254700000010"
-          className="w-full bg-black border border-brand-border rounded-lg px-3 py-2.5 text-brand-textActive placeholder:text-brand-textMuted focus:outline-none focus:border-brand-violet"
+          className="w-full bg-white border border-brand-border rounded-lg px-3 py-2.5 text-brand-textActive placeholder:text-brand-textMuted focus:outline-none focus:border-brand-violet"
         />
       </div>
 
@@ -87,7 +87,7 @@ export function LoginForm() {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full bg-black border border-brand-border rounded-lg px-3 py-2.5 text-brand-textActive focus:outline-none focus:border-brand-violet"
+          className="w-full bg-white border border-brand-border rounded-lg px-3 py-2.5 text-brand-textActive focus:outline-none focus:border-brand-violet"
         />
       </div>
 
@@ -106,7 +106,7 @@ export function LoginForm() {
             value={totpCode}
             onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
             placeholder="123456"
-            className="w-full bg-black border border-brand-border rounded-lg px-3 py-2.5 text-brand-textActive tracking-[0.4em] text-center focus:outline-none focus:border-brand-violet"
+            className="w-full bg-white border border-brand-border rounded-lg px-3 py-2.5 text-brand-textActive tracking-[0.4em] text-center focus:outline-none focus:border-brand-violet"
           />
         </div>
       )}

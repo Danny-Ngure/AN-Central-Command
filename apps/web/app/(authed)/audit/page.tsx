@@ -64,7 +64,7 @@ export default async function AuditLogPage() {
 
       <section className="rounded-xl border border-brand-border bg-brand-cardBg overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-black/40 border-b border-brand-border">
+          <thead className="bg-black/10 border-b border-brand-border">
             <tr className="text-left text-xs uppercase tracking-wider text-brand-textMuted">
               <th className="px-4 py-3 font-semibold">Timestamp</th>
               <th className="px-4 py-3 font-semibold">Actor role</th>

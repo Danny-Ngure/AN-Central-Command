@@ -24,3 +24,4 @@ export * from './community';
 export * from './activities';
 export * from './supporters';
 export * from './election';
+export * from './voters';

@@ -3,26 +3,47 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-// The full suite-switcher (Command vs Data Entry) and badge counts arrive in a
-// later Phase 4 commit. This is the minimal navigation for the dashboard skeleton.
+// Sidebar nav. Role-gated items only render when the user is in the allowlist
+// (e.g. Data Import is privileged — campaign_manager, candidate, chief_strategist,
+// constituency_coordinator, tech_lead). API endpoints enforce the same gate
+// server-side; this client-side check is purely UX.
 
-const NAV = [
-  { href: '/dashboard', label: 'Zen Dashboard' },
-  { href: '/analytics', label: 'Pollings & Analysis' },
-  { href: '/community', label: 'Community Intel' },
-  { href: '/supporters', label: 'Supporter Network' },
-  { href: '/issues', label: 'Issue Tracker' },
-  { href: '/team', label: 'Team Directory' },
-  { href: '/audit', label: 'Audit Logs' },
+const PRIVILEGED_ROLES = new Set([
+  'candidate',
+  'campaign_manager',
+  'chief_strategist',
+  'constituency_coordinator',
+  'tech_lead',
+]);
+
+interface NavItem {
+  href: string;
+  label: string;
+  rolesAllowed?: Set<string>;
+}
+
+const NAV: NavItem[] = [
+  { href: '/dashboard',   label: 'Home' },
+  { href: '/wards',       label: 'Wards' },
+  { href: '/voters',      label: 'Voter Search' },
+  { href: '/analytics',   label: 'Pollings & Analysis' },
+  { href: '/team',        label: 'Team Directory' },
+  { href: '/audit',       label: 'Audit Logs' },
+  { href: '/data-import', label: 'Data Import',    rolesAllowed: PRIVILEGED_ROLES },
 ];
 
-export function Sidebar() {
+interface Props {
+  role: string;
+}
+
+export function Sidebar({ role }: Props) {
   const pathname = usePathname();
+  const visible = NAV.filter((n) => !n.rolesAllowed || n.rolesAllowed.has(role));
 
   return (
     <aside className="w-64 border-r border-brand-border bg-brand-cardBg/60 p-4 shrink-0">
       <nav className="space-y-1">
-        {NAV.map((item) => {
+        {visible.map((item) => {
           const active = pathname === item.href || pathname?.startsWith(item.href + '/');
           return (
             <Link

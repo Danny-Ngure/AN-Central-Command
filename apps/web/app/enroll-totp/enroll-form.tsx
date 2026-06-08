@@ -60,7 +60,7 @@ export function EnrollForm({ step2Token }: Props) {
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
           placeholder="123456"
-          className="w-full bg-black border border-brand-border rounded-lg px-3 py-2.5 text-brand-textActive tracking-[0.4em] text-center text-lg focus:outline-none focus:border-brand-violet"
+          className="w-full bg-white border border-brand-border rounded-lg px-3 py-2.5 text-brand-textActive tracking-[0.4em] text-center text-lg focus:outline-none focus:border-brand-violet"
         />
       </div>
 

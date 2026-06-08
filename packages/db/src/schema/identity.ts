@@ -46,10 +46,20 @@ export const people = pgTable(
     nationalId: text('national_id'),
     fullName: text('full_name').notNull(),
     role: campaignRole('role').notNull(),
+    // Free-text job title for org-chart display. The `role` enum captures permission tier;
+    // `title` captures the specific responsibility (e.g. "Director of Programs", "Patron / Aspirant").
+    title: text('title'),
     // Null for constituency-wide roles (candidate, campaign_manager, chief_strategist,
     // constituency_coordinator, media_head, comms_head, patron_ceo, tech_lead, finance_lead).
     wardId: uuid('ward_id').references(() => wards.id, { onDelete: 'restrict' }),
     photoUrl: text('photo_url'),
+    // Campaign team ID for ID cards / barcodes — ward-initial prefix + sequence
+    // (e.g. FRT001). Generated from ward + seniority; see tools/generate-team-ids.cjs.
+    teamId: text('team_id'),
+    // Certified election-agent details (only set for polling agents). Drives the
+    // "Certified Election Agent" card variant.
+    agentId: text('agent_id'),
+    agentStation: text('agent_station'),
     active: boolean('active').notNull().default(true),
     // SRS FR-080 AC-080.1 — "Active in last 7 days" indicator on the team directory.
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }),

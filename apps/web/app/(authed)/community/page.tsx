@@ -2,6 +2,7 @@ import { communityLeaders, communitySites, villages, wards } from '@an/db';
 import { eq, isNull } from 'drizzle-orm';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
 import { withRlsTx } from '@/lib/api';
+import { AddLeaderForm } from '@/components/add-leader-form';
 
 const LEAN_STYLE: Record<string, string> = {
   supportive: 'text-emerald-500',
@@ -32,28 +33,39 @@ const SITE_TYPE_LABEL: Record<string, string> = {
 
 const HAS_NOTES_ACCESS = new Set(['candidate', 'campaign_manager', 'chief_strategist']);
 
-export default async function CommunityPage() {
+export default async function CommunityPage({ searchParams }: { searchParams: { ward?: string } }) {
   const claims = await getServerAuthOrRedirect();
+  const wardFilter = searchParams.ward ?? null;
 
   const data = await withRlsTx(claims, async (tx) => {
-    const leaderRows = await tx
+    const allLeaders = await tx
       .select()
       .from(communityLeaders)
       .where(isNull(communityLeaders.deletedAt))
       .orderBy(communityLeaders.fullName);
 
-    const siteRows = await tx
+    const allSites = await tx
       .select()
       .from(communitySites)
       .where(isNull(communitySites.deletedAt))
       .orderBy(communitySites.name);
 
-    const wardMap = new Map((await tx.select({ id: wards.id, name: wards.name }).from(wards)).map((w) => [w.id, w.name]));
-    const villageMap = new Map((await tx.select({ id: villages.id, name: villages.name }).from(villages)).map((v) => [v.id, v.name]));
+    // Optional ward scoping via ?ward=<id> (on top of RLS). Used by the Wards menu.
+    const leaderRows = wardFilter ? allLeaders.filter((l) => l.wardId === wardFilter) : allLeaders;
+    const siteRows = wardFilter ? allSites.filter((s) => s.wardId === wardFilter) : allSites;
+
+    const wardList = await tx.select({ id: wards.id, name: wards.name }).from(wards).orderBy(wards.name);
+    const wardMap = new Map(wardList.map((w) => [w.id, w.name]));
+    const villageList = await tx
+      .select({ id: villages.id, name: villages.name, wardId: villages.wardId })
+      .from(villages)
+      .where(isNull(villages.deletedAt))
+      .orderBy(villages.name);
+    const villageMap = new Map(villageList.map((v) => [v.id, v.name]));
 
     const queuedCount = leaderRows.filter((l) => l.isQueuedForReview).length;
 
-    return { leaderRows, siteRows, wardMap, villageMap, queuedCount };
+    return { leaderRows, siteRows, wardMap, villageMap, wardList, villageList, queuedCount, wardFilterName: wardFilter ? wardMap.get(wardFilter) ?? null : null };
   });
 
   const showNotes = HAS_NOTES_ACCESS.has(claims.role);
@@ -61,15 +73,26 @@ export default async function CommunityPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-brand-textActive">Community Intel</h1>
+        <h1 className="text-2xl font-bold text-brand-textActive">
+          Community Leaders
+          {data.wardFilterName && <span className="text-brand-burnt"> · {data.wardFilterName}</span>}
+        </h1>
         <p className="text-sm text-brand-textMuted">
           Community leaders and gathering sites in your authorised wards.
+          {data.wardFilterName && (
+            <>
+              {' '}<a href="/community" className="text-brand-teal hover:underline font-semibold">Show all wards</a>.
+            </>
+          )}
           {data.queuedCount > 0 && (
-            <span className="ml-2 text-brand-cyan">
+            <span className="ml-2 text-brand-teal">
               {data.queuedCount} pending review.
             </span>
           )}
         </p>
+        <div className="pt-1">
+          <AddLeaderForm wards={data.wardList} villages={data.villageList} />
+        </div>
       </header>
 
       {/* Leaders */}
