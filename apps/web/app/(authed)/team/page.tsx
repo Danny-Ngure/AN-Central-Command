@@ -3,6 +3,12 @@ import { eq, isNull, and } from 'drizzle-orm';
 import Link from 'next/link';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
 import { PhoneActions } from '@/components/phone-actions';
+import { AddMemberForm } from '@/components/add-member-form';
+
+// Roles allowed to add team members through the directory (mirrors the API gate).
+const CAN_ADD_MEMBERS = new Set([
+  'candidate', 'campaign_manager', 'chief_strategist', 'constituency_coordinator', 'tech_lead',
+]);
 
 // Team Directory — ANHF public-portal style (large circular photo, name + role
 // stacked and centred). Three groups, switchable from the top-nav "Team" menu
@@ -51,6 +57,103 @@ const WAREMBO_TITLES: Record<string, string> = {
   'Irene Mkamburi': 'Head of Media',
 };
 
+// Warembo wa Alfayo rank-and-file registration roster, grouped by ward (from the
+// REGISTRATION ROSTER doc). Office bearers above are featured as cards; these members
+// are listed below them under "See other members". Office bearers already shown as
+// cards (e.g. Caroline Ruwa, Diana Hildah Ogoye) are intentionally omitted here to
+// avoid double-listing. Phone numbers kept in the local format from the roster.
+const WAREMBO_ROSTER: { ward: string; members: { name: string; phone: string; area?: string }[] }[] = [
+  {
+    ward: 'Mkomani Ward',
+    members: [
+      { name: 'Laura Wambui', phone: '0798645410' },
+      { name: 'Diana Akinyi', phone: '0723875623' },
+      { name: 'Josephine David', phone: '0746303735' },
+      { name: 'Priscillah Wambui', phone: '0707402704' },
+      { name: 'Millicent Mercy', phone: '0702772804' },
+      { name: 'Josephine Achienge', phone: '0769749470' },
+      { name: 'Roselida Masiga', phone: '0795649266' },
+      { name: 'Lucy Ajiambo', phone: '0797372120' },
+      { name: 'Maria Giani', phone: '0711528232' },
+      { name: 'Tatiana Muthoni', phone: '0743390595' },
+      { name: 'Neema Melissa', phone: '0112566433' },
+      { name: 'Velma Ochol', phone: '0111334307' },
+      { name: 'Vivian Benson', phone: '0704968863' },
+      { name: 'Sabina Akinyi', phone: '0769881707' },
+      { name: 'Doreen Ajiambo', phone: '0113913346' },
+      { name: 'Benter Wasonga', phone: '0796008944' },
+      { name: 'Nelly Wambui', phone: '0702756319' },
+      { name: 'Jennifer Lorna', phone: '0700867172' },
+      { name: 'Marisela Odongo', phone: '0791857593' },
+      { name: 'Monica Omburo', phone: '0757431250' },
+      { name: 'Beril Echesa', phone: '0743908258' },
+      { name: 'Faith Joseph', phone: '0705583222' },
+      { name: 'Mourine Atieno', phone: '0119096305' },
+      { name: 'Helen Milisi', phone: '0707437478' },
+      { name: 'Rosemary Manase', phone: '0768417018' },
+      { name: 'Brenda Achieng', phone: '0790615978' },
+      { name: 'Florence Chao', phone: '0795377032' },
+      { name: 'Maurine Achieng', phone: '0792416208' },
+      { name: 'Nereah Muthoni', phone: '0793939217' },
+      { name: 'Mercy Auma Odhiambo', phone: '0712156983' },
+      { name: 'Ivana Oranga', phone: '0741867610' },
+      { name: 'Camilla Achiend', phone: '0795485839' },
+      { name: 'Addlide Agola', phone: '0111800007' },
+      { name: 'Purity Atieno', phone: '0791259663' },
+      { name: 'Lydia Maina', phone: '0790380349' },
+      { name: 'Bernadet Juma', phone: '0743096513' },
+      { name: 'Mary Onyango', phone: '0797075732' },
+      { name: 'Latifa Juma', phone: '0795987229' },
+      { name: 'Winnie Adhiambo', phone: '0714189199' },
+      { name: 'Glory Maku', phone: '0758745526' },
+      { name: 'Berlin Awuor', phone: '0741573984' },
+      { name: 'Cynthia Bwire', phone: '0115261861' },
+      { name: 'Loreen Achieng', phone: '0741593077' },
+      { name: 'Maureen Atieno Oyugi', phone: '0707702871' },
+      { name: 'Anjela Ndeta', phone: '0728137897' },
+      { name: 'Winrose Kadenge', phone: '0743986968' },
+      { name: 'Cynthia Atieno', phone: '0729870970' },
+    ],
+  },
+  {
+    ward: 'Kadzandani Ward',
+    members: [
+      { name: 'Rehema Masha', phone: '0712451650', area: 'Bullo' },
+      { name: 'Janet Kahindi', phone: '0716778117', area: 'Soweto' },
+      { name: 'Happy Munga', phone: '0703853173', area: 'Kadzandani' },
+      { name: 'Bianca Akinyi', phone: '0115489778', area: 'Bashir' },
+      { name: 'Grace Mwikali', phone: '0111856652', area: 'Bullo' },
+      { name: 'Husna Teka', phone: '0113158877', area: 'Bashir' },
+      { name: 'Mariam Khamis', phone: '0712320791', area: 'Teman' },
+      { name: 'Margaret Karanja', phone: '0711374588', area: 'Bullo' },
+      { name: 'Farida Athman', phone: '0727948003', area: 'Ziwa la Ngombe' },
+      { name: 'Sada Mohammed', phone: '0795372711', area: 'Bullo' },
+      { name: 'Dessy Awuor', phone: '0757845251', area: 'Bashir' },
+      { name: 'Evangeline Mwendwa', phone: '0748133039', area: 'Bullo' },
+      { name: 'Eunice F. Luande', phone: '0712619568', area: 'Teman' },
+      { name: 'Mwanaisha Mohammad', phone: '0754320321', area: 'Bullo' },
+      { name: 'Aisha Said', phone: '0723813455', area: 'Bullo' },
+      { name: 'Josephine Safari', phone: '0759392364', area: 'Soweto' },
+      { name: 'Josephine Etenyi', phone: '0791587497', area: 'Bullo' },
+      { name: 'Salma Ronald', phone: '0715019903', area: 'Bullo' },
+      { name: 'Amina Konzi', phone: '0706118893', area: 'Bullo' },
+      { name: 'Jenny Anyango', phone: '0740851821', area: 'Ziwa la Ngombe' },
+      { name: 'Shemina Mweni', phone: '0746764385', area: 'Mwatamba' },
+      { name: 'Khadija Charo', phone: '0794714016', area: 'Bullo' },
+      { name: 'Kazos Kenga', phone: '0115658030', area: 'Kadzandani' },
+      { name: 'Khadija Katana', phone: '0119118214', area: 'Kadzandani' },
+      { name: 'Lilian Lewa', phone: '0798261631', area: 'Kadzandani' },
+      { name: 'Swabrina Sarah', phone: '0740178625', area: 'Bullo' },
+      { name: 'Rukia Juma', phone: '0794533054', area: 'Bullo' },
+      { name: 'Dorothy Mkala', phone: '0740384760', area: 'Soweto' },
+      { name: 'Najma Talib', phone: '0701165613', area: 'Bullo' },
+      { name: 'Lilian Mkala', phone: '0769930648', area: 'Kadzandani' },
+      { name: 'Grace', phone: '0743164509', area: 'Kadzandani' },
+    ],
+  },
+];
+const WAREMBO_ROSTER_COUNT = WAREMBO_ROSTER.reduce((sum, g) => sum + g.members.length, 0);
+
 const OPERATIONAL_BASE: Record<string, string> = {
   'Alfayo Nelson':  'Campaign HQ (Nyali)',
   'Benson Imoli':   'Campaign HQ (Nyali)',
@@ -98,7 +201,7 @@ const ROLE_LABEL: Record<string, string> = {
 type Group = 'executive' | 'wards' | 'warembo' | 'all';
 
 export default async function TeamPage({ searchParams }: { searchParams: { group?: string } }) {
-  await getServerAuthOrRedirect();
+  const claims = await getServerAuthOrRedirect();
   const group: Group = (['executive', 'wards', 'warembo'].includes(searchParams.group ?? '')
     ? searchParams.group
     : 'all') as Group;
@@ -185,6 +288,9 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
   }
   const totalWardTeamCount = Array.from(byWard.values()).reduce((s, l) => s + l.length, 0);
 
+  const canAddMembers = CAN_ADD_MEMBERS.has(claims.role);
+  const wardList = data.wardOrder.map((id) => ({ id, name: data.wardName.get(id) ?? id }));
+
   const showExec = group === 'all' || group === 'executive';
   const showWards = group === 'all' || group === 'wards';
   const showWarembo = group === 'all' || group === 'warembo';
@@ -222,6 +328,13 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
             </Link>
           ))}
         </div>
+
+        {/* Single-entry add — complements bulk /data-import. Privileged roles only. */}
+        {canAddMembers && (
+          <div className="pt-1">
+            <AddMemberForm wards={wardList} />
+          </div>
+        )}
       </header>
 
       {/* 🛠 EXECUTIVE TEAM */}
@@ -271,9 +384,20 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
             if (members.length === 0) return null;
             const wName = data.wardName.get(wId) ?? '—';
             const inCharge = members.find((m) => m.role === 'ward_coordinator');
-            const wardAssistants = members.filter((m) => m.role === 'assistant_ward_coordinator');
+            // Execs explicitly dual-assigned to this ward (e.g. Arnold Baya → Kadzandani)
+            // belong in the Assistant Ward Rep slot, not buried under "other members".
+            const dualAsstNames = new Set(
+              Object.entries(DUAL_WARD_ASSIGNMENTS)
+                .filter(([, dwId]) => dwId === wId)
+                .map(([name]) => name),
+            );
+            const wardAssistants = members.filter(
+              (m) => m.role === 'assistant_ward_coordinator' || dualAsstNames.has(m.fullName),
+            );
             // Execs / Warembo / other members whose home ward is this one.
-            const otherMembers = members.filter((m) => !isWardRole(m.role));
+            const otherMembers = members.filter(
+              (m) => !isWardRole(m.role) && !dualAsstNames.has(m.fullName),
+            );
             return (
               <div key={wId} className="rounded-2xl border border-brand-border bg-brand-cardBg/50 p-4 space-y-4">
                 <div className="flex items-baseline justify-between gap-2 flex-wrap">
@@ -340,17 +464,11 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
       {/* 👩🏽‍🤝‍👩🏽 WAREMBO WA ALFAYO */}
       {showWarembo && (
         <section className="space-y-4">
-          <SectionHeader title="Warembo wa Alfayo" count={`${warembo.length} members`} />
-          {warembo.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-brand-borderStrong bg-brand-cardBg/40 p-8 text-center">
-              <div className="text-3xl mb-2">🌸</div>
-              <div className="text-sm font-semibold text-brand-textActive">No Warembo members added yet</div>
-              <p className="text-xs text-brand-textMuted mt-1 max-w-md mx-auto">
-                The Warembo wa Alfayo women&apos;s wing will appear here. Add members by setting their job
-                title to include &ldquo;Warembo&rdquo;, or share the names and I&apos;ll list them.
-              </p>
-            </div>
-          ) : (
+          <SectionHeader
+            title="Warembo wa Alfayo"
+            count={`${warembo.length} office bearers · ${WAREMBO_ROSTER_COUNT} members`}
+          />
+          {warembo.length > 0 && (
             <CardGrid>
               {warembo.map((p) => (
                 <PersonCard
@@ -364,6 +482,50 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
               ))}
             </CardGrid>
           )}
+
+          {/* Full registration roster — bulk membership behind a disclosure, grouped by ward. */}
+          <details className="group">
+            <summary className="cursor-pointer list-none inline-flex items-center gap-2 rounded-full border border-brand-border bg-brand-cardBg px-4 py-1.5 text-xs font-bold text-brand-textActive hover:border-brand-burnt hover:text-brand-burnt transition select-none">
+              <span className="group-open:hidden">▸ See other members ({WAREMBO_ROSTER_COUNT})</span>
+              <span className="hidden group-open:inline">▾ Hide other members</span>
+            </summary>
+            <div className="mt-4 space-y-6">
+              {WAREMBO_ROSTER.map((grp) => (
+                <div key={grp.ward} className="space-y-2">
+                  <div className="flex items-baseline justify-between border-b border-brand-border/60 pb-1">
+                    <h3 className="text-sm font-bold text-brand-textActive">{grp.ward}</h3>
+                    <span className="text-[11px] text-brand-textMuted">{grp.members.length} members</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {grp.members.map((m, i) => (
+                      <div
+                        key={m.phone || `${m.name}-${i}`}
+                        className="rounded-lg border border-brand-border bg-brand-cardBg/50 px-3 py-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-brand-textActive truncate">
+                            <span className="text-brand-textMuted font-mono mr-1">{i + 1}.</span>
+                            {m.name}
+                          </span>
+                          {m.area && (
+                            <span className="text-[10px] uppercase tracking-wider text-brand-textMuted shrink-0">
+                              {m.area}
+                            </span>
+                          )}
+                        </div>
+                        <a
+                          href={`tel:${m.phone}`}
+                          className="mt-0.5 block text-[11px] font-mono text-brand-aqua hover:text-brand-skyBlue"
+                        >
+                          {m.phone}
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
         </section>
       )}
     </div>

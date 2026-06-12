@@ -473,6 +473,10 @@ export const ENTITY_FIELDS: Record<EntityType, FieldSpec[]> = {
     { field: 'longitude',        label: 'Longitude',          required: false, hints: ['lon', 'lng', 'long'] },
     { field: 'latitude',         label: 'Latitude',           required: false, hints: ['lat'] },
     { field: 'estimatedSize',    label: 'Estimated Congregation Size', required: false, hints: ['size', 'attendance', 'members'] },
+    // Visited status — drives the coverage pie charts & "% visited" everywhere.
+    // Accepts: "Visited", "Visited / Reached", "Yes", "Done", "✓", Swahili "Imefikiwa";
+    // negatives: "Not visited", "Not Reached", "No", Swahili "Hawajafikiwa".
+    { field: 'visited',          label: 'Visited status',     required: false, hints: ['visited', 'status', 'reached', 'tembelewa', 'fikiwa', 'coverage'] },
   ],
 };
 

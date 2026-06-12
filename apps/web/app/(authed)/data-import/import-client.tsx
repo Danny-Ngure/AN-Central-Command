@@ -65,7 +65,8 @@ const ENTITY_OPTIONS: { value: EntityType; label: string; description: string; g
   {
     value: 'sites',
     label: 'Sites (mosques / churches / social)',
-    description: 'Name, type, ward, contact person + phone. Visit tracking on the ward page.',
+    description:
+      'Name, type, ward, contact person + phone, and a Visited column. Visited status feeds the coverage pie charts & "% visited" automatically.',
   },
   {
     value: 'voters',

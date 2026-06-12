@@ -367,6 +367,9 @@ async function commitSites(
 
         const contactPhone = normalisePhone(get('contactPhone'));
         const estimatedSize = parseOptionalNumber(get('estimatedSize'));
+        // Visited status drives the coverage pie charts. `null` = column not mapped or
+        // value unrecognised → leave whatever status the site already has untouched.
+        const visited = parseVisited(get('visited'));
 
         const existing = await tx
           .select({ id: communitySites.id })
@@ -375,18 +378,26 @@ async function commitSites(
           .limit(1);
 
         if (existing.length > 0) {
+          const setObj: Record<string, unknown> = {
+            type: type as any,
+            villageId: villageId ?? undefined,
+            areaName: get('areaName') || undefined,
+            contactPersonName: get('contactPersonName') || undefined,
+            contactRole: get('contactRole') || undefined,
+            contactPhone: contactPhone ?? undefined,
+            estimatedSize: estimatedSize ?? undefined,
+            updatedAt: new Date(),
+          };
+          // Only touch visited columns when the file actually carried a status — a
+          // re-import without a Visited column must never silently un-visit a site.
+          if (visited !== null) {
+            setObj.visited = visited;
+            setObj.visitedAt = visited ? new Date() : null;
+            setObj.visitedByPersonId = visited ? claims.sub : null;
+          }
           await tx
             .update(communitySites)
-            .set({
-              type: type as any,
-              villageId: villageId ?? undefined,
-              areaName: get('areaName') || undefined,
-              contactPersonName: get('contactPersonName') || undefined,
-              contactRole: get('contactRole') || undefined,
-              contactPhone: contactPhone ?? undefined,
-              estimatedSize: estimatedSize ?? undefined,
-              updatedAt: new Date(),
-            })
+            .set(setObj)
             .where(eq(communitySites.id, existing[0]!.id));
           result.updated++;
         } else {
@@ -401,6 +412,9 @@ async function commitSites(
             contactRole: get('contactRole') || null,
             contactPhone: contactPhone ?? null,
             estimatedSize: estimatedSize ?? null,
+            visited: visited ?? false,
+            visitedAt: visited ? new Date() : null,
+            visitedByPersonId: visited ? claims.sub : null,
           });
           result.inserted++;
         }
@@ -840,6 +854,37 @@ function parseDateOnly(raw: string): string | null {
     const ms = (num - 25569) * 86400 * 1000;
     const d = new Date(ms);
     if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+/**
+ * Interpret a free-text "Visited" / "Status" column into a tri-state:
+ *   true   → site has been visited / reached
+ *   false  → explicitly not visited / not reached
+ *   null   → blank or unrecognised → caller leaves existing status untouched
+ *
+ * Negative checks run FIRST because "Not Visited / Not Reached" contains the
+ * substring "visited". Handles English + Swahili campaign vocabulary.
+ */
+function parseVisited(raw: string): boolean | null {
+  const t = raw.trim().toLowerCase();
+  if (t === '') return null;
+  // Negatives first — anything signalling "not yet".
+  if (
+    /\bnot\b/.test(t) ||
+    /\bno\b/.test(t) ||
+    /haijatembelewa|hawajafikiwa|hatujafikiwa|hawaja|bado|pending|outstanding/.test(t) ||
+    t === 'n' || t === 'false' || t === '0' || t === '✗' || t === 'x'
+  ) {
+    return false;
+  }
+  // Positives.
+  if (
+    /visited|reached|tembelewa|imefikiwa|fikiwa|done|complete|covered/.test(t) ||
+    t === 'y' || t === 'yes' || t === 'true' || t === '1' || t === '✓' || t === '✔'
+  ) {
+    return true;
   }
   return null;
 }
