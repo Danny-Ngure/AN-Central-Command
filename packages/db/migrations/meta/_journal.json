@@ -57,6 +57,13 @@
       "when": 1780000500000,
       "tag": "0007_people_title",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780000600000,
+      "tag": "0009_people_team_agent",
+      "breakpoints": true
     }
   ]
 }
