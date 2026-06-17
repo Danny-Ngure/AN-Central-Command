@@ -58,6 +58,16 @@ pnpm db:seed
 pnpm dev
 ```
 
+## Expose local web dev via ngrok
+
+With the web app running on `http://localhost:3000`, start a tunnel:
+
+```bash
+pnpm ngrok
+```
+
+If ngrok reports an upstream connection refusal, make sure the web dev server is already running and reachable at `http://127.0.0.1:3000`.
+
 ## Hosting (per SRS CON-001)
 
 All personal data of Kenyan citizens must be stored on servers physically located in Africa, Kenya preferred where feasible (DPA 2019 §50). Approved hosting regions:

@@ -64,3 +64,6 @@ tools/data/*.json
 tools/data/*.geojson
 tools/data/*.zip
 tools/data/*.sql
+
+# ngrok tunnel policy (contains basic-auth credentials)
+ngrok-policy.yml

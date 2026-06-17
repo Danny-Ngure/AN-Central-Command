@@ -70,6 +70,7 @@ const TEAM_LINKS: SubLink[] = [
   { href: '/team?group=executive', label: 'Executive' },
   { href: '/team?group=wards', label: 'All Wards' },
   { href: '/team?group=warembo', label: 'Warembo' },
+  { href: '/team?group=flames', label: 'Alfayo Flames' },
 ];
 
 const IMPORT_LINKS: SubLink[] = [

@@ -72,7 +72,7 @@ const team = [
 
   // ─── Kongowea ─────────────────────────────────────────────────────────
   { phone: '+254700000070', fullName: 'Salma Khalef',   role: 'ward_coordinator',           title: 'Ward Representative',           wardId: WARD_IDS.Kongowea        },
-  { phone: '+254700000071', fullName: 'Jilo Mohammed',  role: 'assistant_ward_coordinator', title: 'Assistant Ward Representative', wardId: WARD_IDS.Kongowea        },
+  { phone: '+254700000071', fullName: 'Jilo Bakari',    role: 'assistant_ward_coordinator', title: 'Assistant Ward Representative', wardId: WARD_IDS.Kongowea        },
 ];
 
 (async () => {

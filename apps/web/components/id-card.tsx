@@ -29,6 +29,8 @@ export type IdCardProps = {
   pollingCentre?: string | null;
   pollingCode?: string | null;
   variant?: 'member' | 'agent';
+  /** 'rose' gives the member card a feminine pink treatment (Warembo wa Alfayo). */
+  accent?: 'default' | 'rose';
 };
 
 function AnhfMark({ size = 34 }: { size?: number }) {
@@ -43,10 +45,10 @@ function AnhfMark({ size = 34 }: { size?: number }) {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, accent }: { label: string; value: string; accent?: 'default' | 'rose' }) {
   return (
     <div className="leading-tight">
-      <div className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#1e6fc0]">{label}</div>
+      <div className={`text-[9px] font-extrabold uppercase tracking-[0.12em] ${accent === 'rose' ? 'text-[#c0186f]' : 'text-[#1e6fc0]'}`}>{label}</div>
       <div className="text-sm font-bold text-slate-800">{value || '—'}</div>
     </div>
   );
@@ -70,26 +72,31 @@ function SignRow() {
 /* ───────────────────────── MEMBER (landscape) ───────────────────────── */
 
 function MemberFront(p: IdCardProps) {
+  const rose = p.accent === 'rose';
+  const fa = rose ? 'rose' : 'default';
+  const headerGrad = rose ? 'from-[#e85a9b] to-[#9d1457]' : 'from-[#1c6fb8] to-[#0b2c66]';
+  const circle = rose ? 'bg-[#e85a9b]/10' : 'bg-[#1c6fb8]/10';
+  const titleGrad = rose ? 'from-[#d6337f] to-[#a21caf]' : 'from-[#2a5db0] to-[#7b2ff7]';
   return (
     <CardShell className="aspect-[1.6/1]">
-      <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-r from-[#1c6fb8] to-[#0b2c66] flex items-center justify-between px-3">
+      <div className={`absolute inset-x-0 top-0 h-12 bg-gradient-to-r ${headerGrad} flex items-center justify-between px-3`}>
         <AnhfMark />
         <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.12em] text-white">Alfayo Nelson Central Command</span>
       </div>
-      <div className="absolute -left-6 bottom-0 w-24 h-24 rounded-full bg-[#1c6fb8]/10" />
+      <div className={`absolute -left-6 bottom-0 w-24 h-24 rounded-full ${circle}`} />
       <div className="pt-14 px-4 pb-3 flex gap-4 h-full">
         <PhotoBox src={p.photoSrc} name={p.fullName} className="w-[34%] self-start aspect-[4/5] rounded-xl object-top" />
         <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-black uppercase tracking-widest bg-gradient-to-r from-[#2a5db0] to-[#7b2ff7] bg-clip-text text-transparent">Member ID Card</div>
+          <div className={`text-[11px] font-black uppercase tracking-widest bg-gradient-to-r ${titleGrad} bg-clip-text text-transparent`}>{rose ? 'Warembo Member ID' : 'Member ID Card'}</div>
           <div className="text-base font-black uppercase text-slate-900 leading-tight truncate">{p.fullName}</div>
           <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1">
-            <Field label="Member ID" value={p.teamId ?? '—'} />
-            <Field label="ID Number" value={p.nationalId ?? '—'} />
-            <Field label="Phone" value={p.phone ?? '—'} />
-            <Field label="Ward" value={p.wardName ? p.wardName.toUpperCase() : 'CONSTITUENCY-WIDE'} />
-            {p.pollingCentre && <Field label="Polling Station" value={p.pollingCentre} />}
-            {p.pollingCode && <Field label="Station Code" value={p.pollingCode} />}
-            {p.agentId && p.agentId !== p.teamId && <Field label="Agent ID" value={p.agentId} />}
+            <Field label="Member ID" value={p.teamId ?? '—'} accent={fa} />
+            <Field label="ID Number" value={p.nationalId ?? '—'} accent={fa} />
+            <Field label="Phone" value={p.phone ?? '—'} accent={fa} />
+            <Field label="Ward" value={p.wardName ? p.wardName.toUpperCase() : 'CONSTITUENCY-WIDE'} accent={fa} />
+            {p.pollingCentre && <Field label="Polling Station" value={p.pollingCentre} accent={fa} />}
+            {p.pollingCode && <Field label="Station Code" value={p.pollingCode} accent={fa} />}
+            {p.agentId && p.agentId !== p.teamId && <Field label="Agent ID" value={p.agentId} accent={fa} />}
           </div>
         </div>
       </div>
@@ -98,9 +105,12 @@ function MemberFront(p: IdCardProps) {
 }
 
 function MemberBack(p: IdCardProps) {
+  const rose = p.accent === 'rose';
+  const headerGrad = rose ? 'from-[#e85a9b] to-[#9d1457]' : 'from-[#1c6fb8] to-[#0b2c66]';
+  const raceColor = rose ? 'text-[#c0186f]' : 'text-[#1c6fb8]';
   return (
     <CardShell className="aspect-[1.6/1]">
-      <div className="absolute inset-x-0 top-0 h-9 bg-gradient-to-r from-[#1c6fb8] to-[#0b2c66] flex items-center justify-between px-3">
+      <div className={`absolute inset-x-0 top-0 h-9 bg-gradient-to-r ${headerGrad} flex items-center justify-between px-3`}>
         <AnhfMark size={24} />
         <span className="text-[9px] font-bold uppercase tracking-widest text-white/90">{ORG.name}</span>
       </div>
@@ -111,7 +121,7 @@ function MemberBack(p: IdCardProps) {
           <div className="rounded bg-white p-1 border border-slate-200">
             <Barcode value={`${ORG.id}|${p.teamId ?? ''}${p.nationalId ? '|' + p.nationalId : ''}`} height={34} />
           </div>
-          <div className="text-center text-[9px] font-bold uppercase tracking-widest text-[#1c6fb8] mt-1">{ORG.race}</div>
+          <div className={`text-center text-[9px] font-bold uppercase tracking-widest ${raceColor} mt-1`}>{ORG.race}</div>
         </div>
       </div>
     </CardShell>

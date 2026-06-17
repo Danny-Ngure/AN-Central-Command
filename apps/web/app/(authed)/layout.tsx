@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db, people, wards } from '@an/db';
 import { AutoBreadcrumbs } from '@/components/auto-breadcrumbs';
 import { Countdown } from '@/components/countdown';
+import { QuickAdd } from '@/components/quick-add';
 import { SiteFooter } from '@/components/site-footer';
 import { TopNav } from '@/components/top-nav';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
@@ -66,6 +67,8 @@ export default async function AuthedLayout({ children }: { children: React.React
             See apps/web/components/site-footer.tsx for the route → image map. */}
         <SiteFooter />
       </main>
+      {/* Global quick-entry — log an activity from anywhere; flows into the system. */}
+      <QuickAdd wards={allWards} />
     </div>
   );
 }

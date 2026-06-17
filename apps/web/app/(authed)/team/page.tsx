@@ -1,9 +1,15 @@
 import { db, people, wards } from '@an/db';
-import { eq, isNull, and } from 'drizzle-orm';
+import { eq, isNull, and, sql } from 'drizzle-orm';
 import Link from 'next/link';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
 import { PhoneActions } from '@/components/phone-actions';
 import { AddMemberForm } from '@/components/add-member-form';
+import { WaremboRoster } from '@/components/warembo-roster';
+import { WardTeamRoster } from '@/components/ward-team-roster';
+import { WARD_TEAMS, WARD_TEAM_BY_NAME } from '@/data/ward-teams';
+import { FlamesCrew } from '@/components/flames-crew';
+import { FLAMES_CREW } from '@/data/alfayo-flames';
+import { MemberRegistry, type RegInput, type Band } from '@/lib/member-registry';
 
 // Roles allowed to add team members through the directory (mirrors the API gate).
 const CAN_ADD_MEMBERS = new Set([
@@ -62,7 +68,7 @@ const WAREMBO_TITLES: Record<string, string> = {
 // are listed below them under "See other members". Office bearers already shown as
 // cards (e.g. Caroline Ruwa, Diana Hildah Ogoye) are intentionally omitted here to
 // avoid double-listing. Phone numbers kept in the local format from the roster.
-const WAREMBO_ROSTER: { ward: string; members: { name: string; phone: string; area?: string }[] }[] = [
+const WAREMBO_ROSTER: { ward: string; members: { name: string; phone: string; area?: string; id?: string }[] }[] = [
   {
     ward: 'Mkomani Ward',
     members: [
@@ -151,8 +157,111 @@ const WAREMBO_ROSTER: { ward: string; members: { name: string; phone: string; ar
       { name: 'Grace', phone: '0743164509', area: 'Kadzandani' },
     ],
   },
+  {
+    ward: 'Kongowea Ward',
+    members: [
+      { name: 'Zawadi Karisa', phone: '0741953627', id: '969397173' },
+      { name: 'Fatma Athman', phone: '0769390601', id: '37274112' },
+      { name: 'Umi Seif', phone: '0115402621', id: '170526583' },
+      { name: 'Amina Ayub', phone: '0757553088', id: '36462146' },
+      { name: 'Beatrice Akinyi', phone: '0799508180', id: '38484833' },
+      { name: 'Elizabeth Musumba', phone: '0113646147', id: '41311564' },
+      { name: 'Patience Kulola', phone: '0116517012', id: '42074821' },
+      { name: 'Mwanahamisi Swaleh', phone: '0705218587', id: '29873929' },
+      { name: 'Priscilla Makatu', phone: '0702186618', id: '32806691' },
+      { name: 'Brenda Khagali', phone: '0110474755', id: '37515481' },
+      { name: 'Diana Akinyi', phone: '0742542656', id: '41813862' },
+      { name: 'Consolata Akinyi', phone: '0740470631', id: '42820767' },
+      { name: 'Esther Alusa', phone: '0787896531', id: '29811909' },
+      { name: 'Ummy Mwagandi', phone: '0116511067', id: '38707985' },
+      { name: 'Najma Atman', phone: '0797843438', id: '32834092' },
+      { name: 'Sharon Awuor', phone: '0114791152', id: '41950836' },
+      { name: 'Hawa Thuo', phone: '0795778412', id: '34168231' },
+      { name: 'Lyne Muthoni', phone: '0757192956', id: '37982572' },
+      { name: 'Hellen Wakesho', phone: '0768059655', id: '836764076' },
+      { name: 'Fatma Iddi', phone: '0725859854', id: '825453611' },
+      { name: 'Saumu Adam', phone: '0740322889', id: '37650135' },
+      { name: 'Sara Wanjohi', phone: '0742005470', id: '33843080' },
+      { name: 'Mariam Mohamed', phone: '0111865567', id: '472991248' },
+      { name: 'Mary Mitchell', phone: '0715534218', id: '348128157' },
+      { name: 'Mkasi Hamisi', phone: '0741638547', id: '40094875' },
+      { name: 'Grece Mshimba', phone: '0707348824', id: '32172082' },
+      { name: 'Sharon Mukuna', phone: '0114488495', id: '41474582' },
+      { name: 'Seline Juma', phone: '0799532588', id: '39390768' },
+      { name: 'Maimuna Mohammed', phone: '0112509504', id: '42898432' },
+      { name: 'Farida Mbarak', phone: '0114547361', id: '39493135' },
+      { name: 'Bibi Omar', phone: '0717430959', id: '29529866' },
+    ],
+  },
+  {
+    ward: "Ziwa La Ng'ombe Ward",
+    members: [
+      { name: 'Dama Baya', phone: '0724976672', id: '29368771' },
+      { name: 'Rachel Sidi Kahindi', phone: '0741452818', id: '33460066' },
+      { name: 'Grace Aoko', phone: '0799885976', id: '42772192' },
+      { name: 'Mwanahawa Hidaya Chivatsi', phone: '0703596944', id: '30297584' },
+      { name: 'Rukiya Kazzi Hussein', phone: '0114281664', id: '41867264' },
+      { name: 'Grace Atieno', phone: '0714858198', id: '38542530' },
+      { name: 'Esther Reymond', phone: '0748403779', id: '31000838' },
+      { name: 'Paulina Mambea', phone: '0723883091', id: '27928443' },
+      { name: 'Cynthia Agutu', phone: '0116261861', id: '40094894' },
+      { name: 'Caroline Wakio Mambea', phone: '0707711185', id: '389951020' },
+      { name: 'Hellen Sophy', phone: '0117677579', id: '98447918' },
+      { name: 'Sofia Katana', phone: '0743952507', id: '38205973' },
+      { name: 'Alice Dama Charo', phone: '0705829855', id: '31023406' },
+      { name: 'Irene Yangi Ateka', phone: '0792229362', id: '42066107' },
+      { name: 'Linet Bahati Sadaka', phone: '0715420897', id: '27115636' },
+      { name: 'Anjelin Bahati Kalume', phone: '0701623803', id: '35846250' },
+      { name: 'Zeinab Kake Athumani', phone: '0758398910', id: '688449697' },
+      { name: 'Monicah Kaveke', phone: '0716571396', id: '33968691' },
+      { name: 'Hafswa Ramadhan', phone: '0740732252', id: '42965733' },
+      { name: 'Faith Nzina', phone: '0110765024', id: '30888898' },
+      { name: 'Everlyne Malusha', phone: '0708393038', id: '41833407' },
+      { name: 'Norin Makau', phone: '0701535012', id: '30914515' },
+      { name: 'Winimah Moguche Gesare', phone: '0757714205', id: '38696660' },
+      { name: 'Lucia Kathini', phone: '0743732254', id: '34276847' },
+      { name: 'Naima Tabu', phone: '0791563438', id: '32411546' },
+    ],
+  },
+  {
+    ward: 'Frere Town Ward',
+    members: [
+      { name: 'Irene Mkamburi', phone: '0715562217', id: '38583776' },
+      { name: 'Serena Neema', phone: '0117355475', id: '946510751' },
+      { name: 'Pili Adel', phone: '0754757886', id: '679573531' },
+      { name: 'Faith Mwaura', phone: '0768762055', id: '22978033' },
+      { name: 'Zenna', phone: '0115856540', id: '716958174' },
+      { name: 'Lancy', phone: '0118497542', id: '549599549' },
+      { name: 'Mary', phone: '' },
+      { name: 'Salma Bernard', phone: '0111990139' },
+      { name: 'Mariam Mody', phone: '0700032444', id: '32950706' },
+      { name: 'Sofia', phone: '0794934308', id: '41953999' },
+      { name: 'Priscah', phone: '0795178395', id: '38798949' },
+      { name: 'Sonnie', phone: '0700057559', id: '42400440' },
+      { name: 'Veroh', phone: '0757026105' },
+      { name: 'Qauthar', phone: '0117759880', id: '265708715' },
+      { name: 'Mwaka', phone: '0792795715', id: '28018404' },
+      { name: 'Emily', phone: '0757171320', id: '36647308' },
+      { name: 'Amina', phone: '0797027077', id: '36647308' },
+      { name: 'Faith Rasoa', phone: '0110529277', id: '632286122' },
+      { name: 'Naima', phone: '0720426646', id: '41803156' },
+      { name: 'Bishara Anwar', phone: '0790412471', id: '37322605' },
+      { name: 'Tima', phone: '0118994958', id: '588391567' },
+      { name: 'Serah', phone: '0717972635', id: '38559008' },
+      { name: 'Sandra', phone: '0713147766', id: '874748961' },
+      { name: 'Nuru Said Mwambire', phone: '079714641', id: '42959597' },
+    ],
+  },
 ];
 const WAREMBO_ROSTER_COUNT = WAREMBO_ROSTER.reduce((sum, g) => sum + g.members.length, 0);
+
+// Per-ward breakdown for the Petals of Alfayo stat strip (label without the
+// trailing " Ward" for compact tiles).
+const WAREMBO_WARD_BREAKDOWN = WAREMBO_ROSTER.map((g) => ({
+  ward: g.ward.replace(/ Ward$/, ''),
+  count: g.members.length,
+}));
+
 
 const OPERATIONAL_BASE: Record<string, string> = {
   'Alfayo Nelson':  'Campaign HQ (Nyali)',
@@ -198,11 +307,11 @@ const ROLE_LABEL: Record<string, string> = {
   finance_lead: 'Finance Lead',
 };
 
-type Group = 'executive' | 'wards' | 'warembo' | 'all';
+type Group = 'executive' | 'wards' | 'warembo' | 'flames' | 'all';
 
 export default async function TeamPage({ searchParams }: { searchParams: { group?: string } }) {
   const claims = await getServerAuthOrRedirect();
-  const group: Group = (['executive', 'wards', 'warembo'].includes(searchParams.group ?? '')
+  const group: Group = (['executive', 'wards', 'warembo', 'flames'].includes(searchParams.group ?? '')
     ? searchParams.group
     : 'all') as Group;
 
@@ -222,6 +331,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
         photoUrl: people.photoUrl,
         lastActiveAt: people.lastActiveAt,
         teamId: people.teamId,
+        nationalId: people.nationalId,
       })
       .from(people)
       .where(and(eq(people.active, true), isNull(people.deletedAt)))
@@ -231,6 +341,32 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
     const wardName = new Map(wardRows.map((w) => [w.id, w.name]));
     return { peopleRows, wardName, wardOrder: wardRows.map((w) => w.id) };
   })();
+
+  // IEBC enrichment — match every roster member (ward teams + warembo) against the
+  // voter register by National ID and attach their polling station. Same direct-read
+  // posture as the Person 360 page (org-info lookup, not RLS-scoped).
+  const pollingByNid: Record<string, { station: string | null; code: string | null; ward: string | null }> = {};
+  const rosterNids = Array.from(
+    new Set(
+      [
+        ...WARD_TEAMS.flatMap((t) => t.members.map((m) => m.id)),
+        ...WAREMBO_ROSTER.flatMap((g) => g.members.map((m) => m.id)),
+      ].filter((x): x is string => !!x),
+    ),
+  );
+  if (rosterNids.length > 0) {
+    const idList = sql.join(rosterNids.map((id) => sql`${id}`), sql`, `);
+    const rows = (await db.execute(sql`
+      SELECT v.national_id AS nid, w.name AS ward_name, ps.name AS ps_name, ps.iebc_code AS ps_code
+      FROM voters v
+      LEFT JOIN wards w ON w.id = v.ward_id
+      LEFT JOIN polling_stations ps ON ps.id = v.polling_station_id
+      WHERE v.consent_withdrawn_at IS NULL AND v.national_id IN (${idList})
+    `)) as any[];
+    for (const r of rows) {
+      if (r.nid) pollingByNid[String(r.nid)] = { station: r.ps_name ?? null, code: r.ps_code ?? null, ward: r.ward_name ?? null };
+    }
+  }
 
   const isWardRole = (role: string) =>
     role === 'ward_coordinator' || role === 'assistant_ward_coordinator';
@@ -254,6 +390,85 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
   const technical = data.peopleRows
     .filter((p) => !isWardRole(p.role) && !isWarembo(p) && TECH_ROLES.has(p.role) && !FORCE_EXECUTIVE.has(p.fullName))
     .sort(execSort);
+
+  // ── Canonical member-ID registry (one ward-prefixed ID per person) ──────────
+  // Bands: 1 Executive · 2 Coordinators · 3 Technical · 4 Area leaders · 5 Members.
+  // Ward teams keep the ward prefix; Warembo and Flames have their own; a DB-held
+  // ID (e.g. MKM002) sticks with the person even inside another crew.
+  const WARD_PREFIX: Record<string, string> = {
+    'Frere Town': 'FRT', Kadzandani: 'KAD', Kongowea: 'KON', Mkomani: 'MKM', "Ziwa La Ng'ombe": 'ZIW',
+  };
+  const WAREMBO_PREFIX: Record<string, string> = {
+    'Mkomani Ward': 'WMK', 'Kadzandani Ward': 'WAKD', 'Kongowea Ward': 'WAKO',
+    'Frere Town Ward': 'WAFT', "Ziwa La Ng'ombe Ward": 'WAZW',
+  };
+  const execIds = new Set(executive.map((p) => p.id));
+  const techIds = new Set(technical.map((p) => p.id));
+  const photoOf = (p: PersonRow) =>
+    p.photoUrl ? `${p.photoUrl}?v=${p.lastActiveAt ? new Date(p.lastActiveAt).getTime() : 0}` : null;
+  const bandForPerson = (p: PersonRow): Band => {
+    if (execIds.has(p.id)) return 1;
+    if (p.role === 'ward_coordinator' || p.role === 'assistant_ward_coordinator') return 2;
+    if (techIds.has(p.id)) return 3;
+    if (p.role === 'canvasser' || p.role === 'polling_agent') return 5;
+    return 4; // influence_liaison, polling_station_lead, Warembo office bearers, others
+  };
+  const dbPrefix = (p: PersonRow): string =>
+    p.teamId?.match(/^[A-Za-z]+/)?.[0] ??
+    (p.wardId ? WARD_PREFIX[data.wardName.get(p.wardId) ?? ''] : undefined) ??
+    'AN';
+  const regInputs: RegInput[] = [
+    ...data.peopleRows.map((p) => ({
+      name: p.fullName,
+      phone: p.phone,
+      nationalId: p.nationalId,
+      photoSrc: photoOf(p),
+      band: bandForPerson(p),
+      prefix: dbPrefix(p),
+      existingId: p.teamId,
+      crewRank: 0,
+    })),
+    ...WARD_TEAMS.flatMap((t) =>
+      t.members.map((m) => ({
+        name: m.name, phone: m.phone, nationalId: m.id, band: 5 as Band, prefix: t.prefix, existingId: null, crewRank: 0,
+      })),
+    ),
+    ...WAREMBO_ROSTER.flatMap((g) =>
+      g.members.map((m) => ({
+        name: m.name, phone: m.phone, nationalId: m.id, band: 5 as Band, prefix: WAREMBO_PREFIX[g.ward] ?? 'WA', existingId: null, crewRank: 1,
+      })),
+    ),
+    ...FLAMES_CREW.map((m) => ({
+      name: m.name, phone: m.phone, band: 4 as Band, prefix: 'ALF', existingId: null, crewRank: 2,
+    })),
+  ];
+  const registry = new MemberRegistry(regInputs);
+  const memberIdOf = (p: PersonRow) => registry.resolve(p.fullName, p.phone, p.nationalId)?.memberId ?? p.teamId;
+
+  // Enriched roster data (canonical IDs + photos + polling) for the client rosters.
+  const waremboGroups = WAREMBO_ROSTER.map((g) => ({
+    ward: g.ward,
+    members: g.members.map((m) => {
+      const r = registry.resolve(m.name, m.phone, m.id);
+      const hit = m.id ? pollingByNid[m.id] : undefined;
+      return {
+        ...m,
+        memberId: r?.memberId ?? '—',
+        photoSrc: r?.photoSrc ?? null,
+        station: hit?.station ?? null,
+        stationCode: hit?.code ?? null,
+      };
+    }),
+  }));
+  const flamesMembers = FLAMES_CREW.map((m) => {
+    const r = registry.resolve(m.name, m.phone, null);
+    return {
+      ...m,
+      memberId: r?.memberId ?? '—',
+      agentId: r?.agentId ?? '—',
+      photoSrc: r?.photoSrc ?? null,
+    };
+  });
 
   // ── Warembo wa Alfayo ──────────────────────────────────────────────────
   const warembo = data.peopleRows.filter(isWarembo).sort((a, b) => {
@@ -294,12 +509,14 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
   const showExec = group === 'all' || group === 'executive';
   const showWards = group === 'all' || group === 'wards';
   const showWarembo = group === 'all' || group === 'warembo';
+  const showFlames = group === 'all' || group === 'flames';
 
   const TABS: { key: Group; label: string; href: string }[] = [
     { key: 'all', label: 'Everyone', href: '/team' },
     { key: 'executive', label: 'Executive', href: '/team?group=executive' },
     { key: 'wards', label: 'All Wards', href: '/team?group=wards' },
     { key: 'warembo', label: 'Warembo', href: '/team?group=warembo' },
+    { key: 'flames', label: 'Alfayo Flames', href: '/team?group=flames' },
   ];
 
   return (
@@ -346,6 +563,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
               <PersonCard
                 key={p.id}
                 p={p}
+                memberIdOverride={memberIdOf(p)}
                 wardName={null}
                 isSuperUser={SUPER_USER_NAMES.has(p.fullName)}
                 operationalBase={OPERATIONAL_BASE[p.fullName]}
@@ -365,6 +583,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
               <PersonCard
                 key={p.id}
                 p={p}
+                memberIdOverride={memberIdOf(p)}
                 wardName={null}
                 isSuperUser={SUPER_USER_NAMES.has(p.fullName)}
                 operationalBase={OPERATIONAL_BASE[p.fullName]}
@@ -398,8 +617,23 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
             const otherMembers = members.filter(
               (m) => !isWardRole(m.role) && !dualAsstNames.has(m.fullName),
             );
+            const wardTeam = WARD_TEAM_BY_NAME[wName];
+            const wardTeamMembers = (wardTeam?.members ?? []).map((m) => {
+              const r = registry.resolve(m.name, m.phone, m.id);
+              const hit = m.id ? pollingByNid[m.id] : undefined;
+              return {
+                ...m,
+                memberId: r?.memberId ?? '—',
+                agentId: r?.agentId ?? '—',
+                photoSrc: r?.photoSrc ?? null,
+                station: hit?.station ?? null,
+                stationCode: hit?.code ?? null,
+                votesWard: hit?.ward ?? null,
+              };
+            });
             return (
               <div key={wId} className="rounded-2xl border border-brand-border bg-brand-cardBg/50 p-4 space-y-4">
+                {/* Leaders only by default; the button below reveals the whole list. */}
                 <div className="flex items-baseline justify-between gap-2 flex-wrap">
                   <h3 className="text-base font-bold text-brand-textActive">{wName} Ward</h3>
                   {inCharge && (
@@ -408,11 +642,13 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
                     </span>
                   )}
                 </div>
+
                 {/* Leadership — always shown */}
                 <CardGrid>
                   {inCharge && (
                     <PersonCard
                       p={inCharge}
+                      memberIdOverride={memberIdOf(inCharge)}
                       wardName={wName}
                       isSuperUser={SUPER_USER_NAMES.has(inCharge.fullName)}
                       operationalBase={null}
@@ -424,6 +660,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
                     <PersonCard
                       key={a.id + ':' + wId}
                       p={a}
+                      memberIdOverride={memberIdOf(a)}
                       wardName={wName}
                       isSuperUser={SUPER_USER_NAMES.has(a.fullName)}
                       operationalBase={null}
@@ -432,26 +669,48 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
                   ))}
                 </CardGrid>
 
-                {/* Other ward members — collapsed behind a button */}
-                {otherMembers.length > 0 && (
+                {/* One button to reveal the WHOLE member list (field team + others). */}
+                {(wardTeam || otherMembers.length > 0) && (
                   <details className="group">
-                    <summary className="cursor-pointer list-none inline-flex items-center gap-2 rounded-full border border-brand-border bg-brand-cardBg px-4 py-1.5 text-xs font-bold text-brand-textActive hover:border-brand-burnt hover:text-brand-burnt transition select-none">
-                      <span className="group-open:hidden">▸ See other members ({otherMembers.length})</span>
-                      <span className="hidden group-open:inline">▾ Hide other members</span>
+                    <summary className="cursor-pointer list-none inline-flex items-center gap-2 rounded-full border border-brand-burnt/50 bg-brand-burnt/10 px-4 py-1.5 text-xs font-bold text-brand-burnt hover:bg-brand-burnt/20 transition select-none">
+                      <span className="group-open:hidden">
+                        ▸ See all {wName} members ({(wardTeam?.members.length ?? 0) + otherMembers.length})
+                      </span>
+                      <span className="hidden group-open:inline">▾ Hide {wName} members</span>
                     </summary>
-                    <div className="mt-3">
-                      <CardGrid>
-                        {otherMembers.map((a) => (
-                          <PersonCard
-                            key={a.id + ':' + wId}
-                            p={a}
-                            wardName={wName}
-                            isSuperUser={SUPER_USER_NAMES.has(a.fullName)}
-                            operationalBase={null}
-                            dualRole
-                          />
-                        ))}
-                      </CardGrid>
+
+                    <div className="mt-3 space-y-4">
+                      {/* Field-team roster — tap any name for their Member & Agent ID card. */}
+                      {wardTeam && (
+                        <div className="rounded-xl border border-brand-border/60 bg-brand-cardBgHeavy/40 p-3">
+                          <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-brand-textMuted">
+                            Field Team — tap any name for their Member &amp; Agent ID card
+                          </div>
+                          <WardTeamRoster ward={wName} members={wardTeamMembers} />
+                        </div>
+                      )}
+
+                      {/* Other DB members whose home ward is this one. */}
+                      {otherMembers.length > 0 && (
+                        <div>
+                          <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-brand-textMuted">
+                            Other members
+                          </div>
+                          <CardGrid>
+                            {otherMembers.map((a) => (
+                              <PersonCard
+                                key={a.id + ':' + wId}
+                                p={a}
+                                memberIdOverride={memberIdOf(a)}
+                                wardName={wName}
+                                isSuperUser={SUPER_USER_NAMES.has(a.fullName)}
+                                operationalBase={null}
+                                dualRole
+                              />
+                            ))}
+                          </CardGrid>
+                        </div>
+                      )}
                     </div>
                   </details>
                 )}
@@ -468,12 +727,41 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
             title="Warembo wa Alfayo"
             count={`${warembo.length} office bearers · ${WAREMBO_ROSTER_COUNT} members`}
           />
+
+          {/* 🌸 Petals of Alfayo — identity badge + modest per-ward breakdown.
+              Sits above the office bearers so the ward strength reads at a glance. */}
+          <div className="rounded-xl border border-pink-300/25 bg-gradient-to-br from-pink-500/[0.06] via-transparent to-transparent p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-pink-500/15 border border-pink-400/40 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-pink-300">
+                🌸 Petals of Alfayo
+              </span>
+              <span className="text-xs text-brand-textMuted">
+                <span className="font-bold text-brand-gold">{WAREMBO_ROSTER_COUNT}</span> warembo across{' '}
+                <span className="font-bold text-brand-gold">{WAREMBO_WARD_BREAKDOWN.length}</span> wards
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {WAREMBO_WARD_BREAKDOWN.map((b) => (
+                <div
+                  key={b.ward}
+                  className="rounded-lg border border-brand-border bg-brand-cardBg/60 px-3 py-2 text-center"
+                >
+                  <div className="text-xl font-extrabold leading-none text-brand-gold">{b.count}</div>
+                  <div className="mt-1 text-[10px] uppercase tracking-wide text-brand-textMuted truncate" title={b.ward}>
+                    {b.ward}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {warembo.length > 0 && (
             <CardGrid>
               {warembo.map((p) => (
                 <PersonCard
                   key={p.id}
                   p={p}
+                  memberIdOverride={memberIdOf(p)}
                   wardName={p.wardId ? data.wardName.get(p.wardId) ?? null : null}
                   isSuperUser={SUPER_USER_NAMES.has(p.fullName)}
                   operationalBase={OPERATIONAL_BASE[p.fullName]}
@@ -489,43 +777,30 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
               <span className="group-open:hidden">▸ See other members ({WAREMBO_ROSTER_COUNT})</span>
               <span className="hidden group-open:inline">▾ Hide other members</span>
             </summary>
-            <div className="mt-4 space-y-6">
-              {WAREMBO_ROSTER.map((grp) => (
-                <div key={grp.ward} className="space-y-2">
-                  <div className="flex items-baseline justify-between border-b border-brand-border/60 pb-1">
-                    <h3 className="text-sm font-bold text-brand-textActive">{grp.ward}</h3>
-                    <span className="text-[11px] text-brand-textMuted">{grp.members.length} members</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {grp.members.map((m, i) => (
-                      <div
-                        key={m.phone || `${m.name}-${i}`}
-                        className="rounded-lg border border-brand-border bg-brand-cardBg/50 px-3 py-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-semibold text-brand-textActive truncate">
-                            <span className="text-brand-textMuted font-mono mr-1">{i + 1}.</span>
-                            {m.name}
-                          </span>
-                          {m.area && (
-                            <span className="text-[10px] uppercase tracking-wider text-brand-textMuted shrink-0">
-                              {m.area}
-                            </span>
-                          )}
-                        </div>
-                        <a
-                          href={`tel:${m.phone}`}
-                          className="mt-0.5 block text-[11px] font-mono text-brand-aqua hover:text-brand-skyBlue"
-                        >
-                          {m.phone}
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <WaremboRoster groups={waremboGroups} />
           </details>
+        </section>
+      )}
+
+      {/* 🔥 ALFAYO FLAMES */}
+      {showFlames && (
+        <section className="space-y-4">
+          <SectionHeader title="Alfayo Flames" count={`${FLAMES_CREW.length} crew`} />
+          <div className="rounded-xl border border-brand-rust/30 bg-gradient-to-br from-brand-rust/[0.07] via-transparent to-transparent p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-rust/15 border border-brand-rust/40 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-brand-rust">
+                🔥 Alfayo Flames Crew
+              </span>
+              <span className="text-xs text-brand-textMuted">
+                Leadership &amp; in-charge · tap any name for their Member &amp; Agent ID card
+              </span>
+            </div>
+            <FlamesCrew members={flamesMembers} />
+            <p className="text-[11px] text-brand-textMuted italic">
+              This is the in-charge list — rank-and-file crew to follow. Add National IDs to link their IEBC
+              polling stations automatically.
+            </p>
+          </div>
         </section>
       )}
     </div>
@@ -572,6 +847,7 @@ interface PersonRow {
   photoUrl: string | null;
   lastActiveAt: Date | null;
   teamId: string | null;
+  nationalId: string | null;
 }
 
 // Portal-style card: big circular photo, name + role centred beneath.
@@ -584,6 +860,7 @@ function PersonCard({
   forceLabel,
   titleOverride,
   dualRole,
+  memberIdOverride,
 }: {
   p: PersonRow;
   wardName: string | null;
@@ -596,7 +873,9 @@ function PersonCard({
   // Warembo "Head of Media") shows the right title per section.
   titleOverride?: string;
   dualRole?: boolean;
+  memberIdOverride?: string | null;
 }) {
+  const memberId = memberIdOverride ?? p.teamId;
   const initials = p.fullName.split(' ').slice(0, 2).map((s) => s[0]).join('').toUpperCase();
   const roleLabel = titleOverride ?? p.title ?? forceLabel ?? ROLE_LABEL[p.role] ?? p.role;
   const ver = p.lastActiveAt ? new Date(p.lastActiveAt).getTime() : 0;
@@ -660,14 +939,14 @@ function PersonCard({
         {wardName ? wardName : operationalBase ? operationalBase : ROLE_LABEL[p.role] ?? p.role}
       </div>
 
-      {/* Team ID badge — clickable to the ID card */}
-      {p.teamId && (
+      {/* Member ID badge — canonical registry ID, clickable to the ID card */}
+      {memberId && (
         <Link
           href={`/team/${p.id}`}
           className="mt-1 inline-block rounded-md bg-brand-burnt/15 border border-brand-burnt/30 px-2 py-0.5 text-[10px] font-black tracking-widest text-brand-burnt hover:bg-brand-burnt hover:text-white transition"
           title="View ID card"
         >
-          {p.teamId}
+          {memberId}
         </Link>
       )}
 
