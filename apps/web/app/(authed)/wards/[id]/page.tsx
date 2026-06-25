@@ -448,6 +448,7 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
                   color: i === 0 ? '#ff6600' : i < 3 ? '#00ccff' : '#025e73',
                   sublabel: `${s.iebcCode} · ${s.voterCount.toLocaleString()} voters`,
                   highlight: i === 0,
+                  href: `/polling-stations/${s.id}`,
                 }))}
                 showValue={false}
               />
@@ -488,17 +489,19 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
             <Link
               key={s.id}
               href={`/polling-stations/${s.id}`}
-              className="group block rounded-lg border border-brand-border bg-brand-cardBg p-3 hover:border-brand-tealBlue hover:shadow-brand-teal transition"
+              className="group block rounded-lg border-l-4 border-l-brand-skyBlue border border-brand-skyBlue/30 bg-brand-skyBlue/[0.07] p-3 hover:bg-brand-skyBlue/15 hover:border-brand-skyBlue hover:shadow-brand-teal transition"
             >
               <div className="flex items-baseline justify-between gap-2">
-                <div className="font-semibold text-brand-textActive truncate">{s.name}</div>
+                <div className="font-semibold text-brand-skyBlue truncate flex items-center gap-1.5">
+                  <span className="text-xs">🗳</span>{s.name}
+                </div>
                 <span className="text-[10px] font-mono text-brand-textMuted shrink-0">{s.iebcCode}</span>
               </div>
               <div className="text-xs text-brand-textMuted">
                 {s.registeredVoters.toLocaleString()} registered
                 {s.turnout2022 !== null && <> · 2022 turnout {s.turnout2022}%</>}
               </div>
-              <div className="mt-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-brand-tealBlue/15 text-brand-skyBlue text-[10px] font-bold uppercase tracking-wider group-hover:bg-brand-tealBlue group-hover:text-white transition">
+              <div className="mt-3 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-brand-skyBlue text-white text-[10px] font-bold uppercase tracking-wider shadow-sm group-hover:bg-brand-tealBlue transition">
                 View voters →
               </div>
             </Link>
