@@ -33,7 +33,7 @@ import { AddWardMemberForm } from '@/components/add-ward-member-form';
 // 6 tabs total: Coverage (overview) · Mosques · Churches · Social/Community · Boda · Other
 // Coverage tab is special — it doesn't filter by type, it shows visited% donuts per
 // category. All other tabs render the SiteCard list for their types.
-type SiteTabKey = 'coverage' | 'mosques' | 'churches' | 'social' | 'boda' | 'other';
+type SiteTabKey = 'coverage' | 'mosques' | 'churches' | 'social' | 'boda' | 'schools' | 'welfare' | 'other';
 
 const SITE_TAB_DEF: Array<{ key: SiteTabKey; label: string; types: string[] }> = [
   { key: 'coverage', label: 'Coverage',                             types: [] /* aggregates everything */ },
@@ -41,8 +41,13 @@ const SITE_TAB_DEF: Array<{ key: SiteTabKey; label: string; types: string[] }> =
   { key: 'churches', label: 'Churches',                             types: ['church'] },
   { key: 'social',   label: 'Social Halls & Community Centres',     types: ['social_hall', 'community_hall', 'youth_center', 'sports_club'] },
   { key: 'boda',     label: 'Boda Boda Centres',                    types: ['boda_stage'] },
-  { key: 'other',    label: 'Other',                                types: ['matatu_stage', 'market', 'shopping_center', 'school_primary', 'school_secondary', 'school_other', 'chama', 'sacco', 'self_help_group', 'health_facility', 'government_office', 'other'] },
+  { key: 'schools',  label: 'Schools',                              types: ['school_public', 'school_private', 'school_primary', 'school_secondary', 'school_other'] },
+  { key: 'welfare',  label: 'Welfare Groups',                       types: ['welfare_group', 'self_help_group', 'chama', 'sacco'] },
+  { key: 'other',    label: 'Other',                                types: ['matatu_stage', 'market', 'shopping_center', 'health_facility', 'government_office', 'other'] },
 ];
+
+// Within the Schools tab, sites are sub-grouped Public vs Private.
+const PUBLIC_SCHOOL_TYPES = new Set(['school_public', 'school_primary', 'school_secondary']);
 
 function tabKeyForType(t: string): SiteTabKey {
   // Coverage isn't a real category — it never matches a site type, but Other is the fallback.
@@ -69,7 +74,7 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
   const activeTab: TopTab = (['demographics', 'stations', 'sites', 'leaders', 'itinerary'].includes(searchParams.tab ?? '')
     ? searchParams.tab
     : 'sites') as TopTab;
-  const activeSiteTab: SiteTabKey = (['coverage', 'mosques', 'churches', 'social', 'boda', 'other'].includes(searchParams.siteTab ?? '')
+  const activeSiteTab: SiteTabKey = (['coverage', 'mosques', 'churches', 'social', 'boda', 'schools', 'welfare', 'other'].includes(searchParams.siteTab ?? '')
     ? searchParams.siteTab
     : 'coverage') as SiteTabKey;
 
@@ -210,7 +215,7 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
   const tabCounts = SITE_TAB_DEF.reduce<Record<SiteTabKey, { total: number; visited: number }>>((acc, t) => {
     acc[t.key] = { total: 0, visited: 0 };
     return acc;
-  }, { coverage: { total: 0, visited: 0 }, mosques: { total: 0, visited: 0 }, churches: { total: 0, visited: 0 }, social: { total: 0, visited: 0 }, boda: { total: 0, visited: 0 }, other: { total: 0, visited: 0 } });
+  }, { coverage: { total: 0, visited: 0 }, mosques: { total: 0, visited: 0 }, churches: { total: 0, visited: 0 }, social: { total: 0, visited: 0 }, boda: { total: 0, visited: 0 }, schools: { total: 0, visited: 0 }, welfare: { total: 0, visited: 0 }, other: { total: 0, visited: 0 } });
   for (const s of sites) {
     const k = tabKeyForType(s.type);
     tabCounts[k].total++;
@@ -647,8 +652,47 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
           )
         )}
 
-        {/* Per-category SiteCard list (any tab other than coverage) */}
-        {activeSiteTab !== 'coverage' && (
+        {/* Schools tab — split Public vs Private */}
+        {activeSiteTab === 'schools' && (
+          sitesInActiveTab.length === 0 ? (
+            <div className="text-sm text-brand-textMuted italic py-4 text-center">
+              No schools in this ward yet.
+              <br />
+              <Link href={`/wards/${ward.id}/import?entity=sites`} className="text-brand-orangeBright hover:underline mt-1 inline-block">
+                + Add via Data Import → Sites
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-5 pt-1">
+              {([
+                { label: 'Public Schools', list: sitesInActiveTab.filter((s) => PUBLIC_SCHOOL_TYPES.has(s.type)) },
+                { label: 'Private Schools', list: sitesInActiveTab.filter((s) => !PUBLIC_SCHOOL_TYPES.has(s.type)) },
+              ] as const).map((grp) => {
+                const grpVisited = grp.list.filter((s) => s.visited).length;
+                return (
+                  <div key={grp.label} className="space-y-2">
+                    <div className="flex items-baseline justify-between border-b border-brand-border pb-1">
+                      <h3 className="text-sm font-bold text-brand-textActive">{grp.label}</h3>
+                      <span className="text-xs text-brand-textMuted">
+                        {grp.list.length === 0 ? '—' : <><span className="text-brand-success font-semibold">{grpVisited}</span>/{grp.list.length} visited</>}
+                      </span>
+                    </div>
+                    {grp.list.length === 0 ? (
+                      <p className="text-xs text-brand-textMuted italic">None recorded.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {grp.list.map((s) => <SiteCard key={s.id} site={s} />)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )
+        )}
+
+        {/* Per-category SiteCard list (any tab other than coverage / schools) */}
+        {activeSiteTab !== 'coverage' && activeSiteTab !== 'schools' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
             {sitesInActiveTab.map((s) => (
               <SiteCard key={s.id} site={s} />
