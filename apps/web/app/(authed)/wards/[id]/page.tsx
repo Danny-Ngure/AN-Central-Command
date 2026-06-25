@@ -41,13 +41,14 @@ const SITE_TAB_DEF: Array<{ key: SiteTabKey; label: string; types: string[] }> =
   { key: 'churches', label: 'Churches',                             types: ['church'] },
   { key: 'social',   label: 'Social Halls & Community Centres',     types: ['social_hall', 'community_hall', 'youth_center', 'sports_club'] },
   { key: 'boda',     label: 'Boda Boda Centres',                    types: ['boda_stage'] },
-  { key: 'schools',  label: 'Schools',                              types: ['school_public', 'school_private', 'school_primary', 'school_secondary', 'school_other'] },
+  { key: 'schools',  label: 'Schools',                              types: ['school_public', 'school_private', 'school_tertiary', 'school_primary', 'school_secondary', 'school_other'] },
   { key: 'welfare',  label: 'Welfare Groups',                       types: ['welfare_group', 'self_help_group', 'chama', 'sacco'] },
   { key: 'other',    label: 'Other',                                types: ['matatu_stage', 'market', 'shopping_center', 'health_facility', 'government_office', 'other'] },
 ];
 
-// Within the Schools tab, sites are sub-grouped Public vs Private.
+// Within the Schools tab, sites are sub-grouped Public / Private / Tertiary.
 const PUBLIC_SCHOOL_TYPES = new Set(['school_public', 'school_primary', 'school_secondary']);
+const TERTIARY_SCHOOL_TYPES = new Set(['school_tertiary']);
 
 function tabKeyForType(t: string): SiteTabKey {
   // Coverage isn't a real category — it never matches a site type, but Other is the fallback.
@@ -669,7 +670,8 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
             <div className="space-y-5 pt-1">
               {([
                 { label: 'Public Schools', list: sitesInActiveTab.filter((s) => PUBLIC_SCHOOL_TYPES.has(s.type)) },
-                { label: 'Private Schools', list: sitesInActiveTab.filter((s) => !PUBLIC_SCHOOL_TYPES.has(s.type)) },
+                { label: 'Private Schools', list: sitesInActiveTab.filter((s) => !PUBLIC_SCHOOL_TYPES.has(s.type) && !TERTIARY_SCHOOL_TYPES.has(s.type)) },
+                { label: 'Tertiary Institutions', list: sitesInActiveTab.filter((s) => TERTIARY_SCHOOL_TYPES.has(s.type)) },
               ] as const).map((grp) => {
                 const grpVisited = grp.list.filter((s) => s.visited).length;
                 return (

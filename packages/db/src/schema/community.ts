@@ -61,6 +61,7 @@ export const communitySites = pgTable(
       | 'school_other'
       | 'school_public'
       | 'school_private'
+      | 'school_tertiary'
       | 'welfare_group'
       | 'market'
       | 'shopping_center'
