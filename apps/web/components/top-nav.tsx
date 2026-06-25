@@ -82,6 +82,8 @@ const IMPORT_LINKS: SubLink[] = [
 function wardLinks(id: string): SubLink[] {
   return [
     { href: `/wards/${id}?tab=sites`, label: 'Sites' },
+    { href: `/wards/${id}?tab=sites&siteTab=schools`, label: 'Schools' },
+    { href: `/wards/${id}?tab=sites&siteTab=welfare`, label: 'Welfare Groups' },
     { href: `/wards/${id}/villages`, label: 'Villages' },
     { href: `/community?ward=${id}`, label: 'Community Leaders' },
   ];
