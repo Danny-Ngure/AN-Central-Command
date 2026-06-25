@@ -8,7 +8,8 @@ import { WaremboRoster } from '@/components/warembo-roster';
 import { WardTeamRoster } from '@/components/ward-team-roster';
 import { WARD_TEAMS, WARD_TEAM_BY_NAME } from '@/data/ward-teams';
 import { FlamesCrew } from '@/components/flames-crew';
-import { FLAMES_CREW } from '@/data/alfayo-flames';
+import { FlamesRoster } from '@/components/flames-roster';
+import { FLAMES_CREW, FLAMES_ROSTER, FLAMES_ROSTER_COUNT, FLAMES_WARD_PREFIX } from '@/data/alfayo-flames';
 import { MemberRegistry, type RegInput, type Band } from '@/lib/member-registry';
 
 // Roles allowed to add team members through the directory (mirrors the API gate).
@@ -441,6 +442,11 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
     ...FLAMES_CREW.map((m) => ({
       name: m.name, phone: m.phone, band: 4 as Band, prefix: 'ALF', existingId: null, crewRank: 2,
     })),
+    ...FLAMES_ROSTER.flatMap((g) =>
+      g.members.map((m) => ({
+        name: m.name, phone: m.phone, band: 5 as Band, prefix: FLAMES_WARD_PREFIX[g.ward] ?? 'FL', existingId: null, crewRank: 2,
+      })),
+    ),
   ];
   const registry = new MemberRegistry(regInputs);
   const memberIdOf = (p: PersonRow) => registry.resolve(p.fullName, p.phone, p.nationalId)?.memberId ?? p.teamId;
@@ -469,6 +475,18 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
       photoSrc: r?.photoSrc ?? null,
     };
   });
+  const flamesGroups = FLAMES_ROSTER.map((g) => ({
+    ward: g.ward,
+    members: g.members.map((m) => {
+      const r = registry.resolve(m.name, m.phone, null);
+      return {
+        ...m,
+        memberId: r?.memberId ?? '—',
+        agentId: r?.agentId ?? '—',
+        photoSrc: r?.photoSrc ?? null,
+      };
+    }),
+  }));
 
   // ── Warembo wa Alfayo ──────────────────────────────────────────────────
   const warembo = data.peopleRows.filter(isWarembo).sort((a, b) => {
@@ -785,7 +803,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
       {/* 🔥 ALFAYO FLAMES */}
       {showFlames && (
         <section className="space-y-4">
-          <SectionHeader title="Alfayo Flames" count={`${FLAMES_CREW.length} crew`} />
+          <SectionHeader title="Alfayo Flames" count={`${FLAMES_CREW.length} leadership · ${FLAMES_ROSTER_COUNT} ward crew`} />
           <div className="rounded-xl border border-brand-rust/30 bg-gradient-to-br from-brand-rust/[0.07] via-transparent to-transparent p-4 space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-rust/15 border border-brand-rust/40 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-brand-rust">
@@ -796,9 +814,20 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
               </span>
             </div>
             <FlamesCrew members={flamesMembers} />
+
+            {/* Rank-and-file ward crew behind a disclosure, grouped by ward. */}
+            <details className="group">
+              <summary className="cursor-pointer list-none inline-flex items-center gap-2 rounded-full border border-brand-rust/30 bg-brand-cardBg px-4 py-1.5 text-xs font-bold text-brand-textActive hover:border-brand-burnt hover:text-brand-burnt transition select-none">
+                <span className="group-open:hidden">▸ See ward crew ({FLAMES_ROSTER_COUNT})</span>
+                <span className="hidden group-open:inline">▾ Hide ward crew</span>
+              </summary>
+              <FlamesRoster groups={flamesGroups} />
+            </details>
+
             <p className="text-[11px] text-brand-textMuted italic">
-              This is the in-charge list — rank-and-file crew to follow. Add National IDs to link their IEBC
-              polling stations automatically.
+              Leadership above; ward crew grouped by ward below. IEBC voter cross-match (registered-voter
+              badges + polling stations) is on the{' '}
+              <Link href="/flames" className="text-brand-rust hover:underline">Flames page</Link>.
             </p>
           </div>
         </section>
