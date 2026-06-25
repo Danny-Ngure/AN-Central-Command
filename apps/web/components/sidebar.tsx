@@ -26,6 +26,7 @@ const NAV: NavItem[] = [
   { href: '/dashboard',   label: 'Home' },
   { href: '/wards',       label: 'Wards' },
   { href: '/voters',      label: 'Voter Search' },
+  { href: '/flames',      label: '🔥 Alfayo Flames' },
   { href: '/analytics',   label: 'Pollings & Analysis' },
   { href: '/team',        label: 'Team Directory' },
   { href: '/audit',       label: 'Audit Logs' },
