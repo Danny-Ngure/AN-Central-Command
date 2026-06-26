@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { sql, eq, and, isNull, inArray, notInArray } from 'drizzle-orm';
+import { sql, eq, and, isNull, inArray, notInArray, or } from 'drizzle-orm';
 import {
   communityLeaders,
   communitySites,
   people,
   pollingStations,
+  roads,
   villages,
   voters,
   wards,
@@ -59,7 +60,7 @@ function tabKeyForType(t: string): SiteTabKey {
 }
 
 // ───────── Top-level tabs ─────────
-type TopTab = 'demographics' | 'stations' | 'sites' | 'leaders' | 'itinerary';
+type TopTab = 'demographics' | 'stations' | 'sites' | 'leaders' | 'itinerary' | 'roads';
 
 interface PageProps {
   params: { id: string };
@@ -72,7 +73,7 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
   const cleanedCount = Number(searchParams.cleaned ?? 0);  // legacy single-counter
   const mergedCount = Number(searchParams.merged ?? 0);
   const deletedCount = Number(searchParams.deleted ?? 0);
-  const activeTab: TopTab = (['demographics', 'stations', 'sites', 'leaders', 'itinerary'].includes(searchParams.tab ?? '')
+  const activeTab: TopTab = (['demographics', 'stations', 'sites', 'leaders', 'itinerary', 'roads'].includes(searchParams.tab ?? '')
     ? searchParams.tab
     : 'sites') as TopTab;
   const activeSiteTab: SiteTabKey = (['coverage', 'mosques', 'churches', 'social', 'boda', 'schools', 'welfare', 'other'].includes(searchParams.siteTab ?? '')
@@ -180,12 +181,24 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
       ))
       .orderBy(people.fullName);
 
-    return { ward, demo: demoRow ?? null, stationVoterCounts, stations, sites, leaders, villageRows, wardTeam, wardMembers, siblingWards };
+    // Roads in this ward + constituency-wide (ward_id null) trunk roads.
+    const wardRoads = await tx
+      .select({
+        id: roads.id, name: roads.name, status: roads.status, funding: roads.funding,
+        surface: roads.surface, lengthKm: roads.lengthKm, mpProject: roads.mpProject,
+        notes: roads.notes, wardId: roads.wardId,
+        fromVillageId: roads.fromVillageId, toVillageId: roads.toVillageId,
+      })
+      .from(roads)
+      .where(and(isNull(roads.deletedAt), or(eq(roads.wardId, wardId), isNull(roads.wardId))))
+      .orderBy(roads.name);
+
+    return { ward, demo: demoRow ?? null, stationVoterCounts, stations, sites, leaders, villageRows, wardTeam, wardMembers, siblingWards, wardRoads };
   });
 
   if (!data) notFound();
 
-  const { ward, demo, stationVoterCounts, stations, sites, leaders, villageRows, wardTeam, wardMembers, siblingWards } = data;
+  const { ward, demo, stationVoterCounts, stations, sites, leaders, villageRows, wardTeam, wardMembers, siblingWards, wardRoads } = data;
   const wardCoordinator = wardTeam.find((t) => t.role === 'ward_coordinator') ?? null;
   const wardAssistants = wardTeam.filter((t) => t.role === 'assistant_ward_coordinator');
 
@@ -348,7 +361,85 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
         >
           📅 Itinerary &amp; meetings
         </Link>
+        <Link
+          href={`/wards/${ward.id}?tab=roads`}
+          className={[
+            'px-5 py-3 text-base sm:text-lg font-bold uppercase tracking-wide border-b-[3px] -mb-px transition whitespace-nowrap shrink-0',
+            activeTab === 'roads'
+              ? 'border-brand-orangeBright text-brand-textActive'
+              : 'border-transparent text-brand-textMuted hover:text-brand-textActive hover:border-brand-border',
+          ].join(' ')}
+        >
+          🛣️ Roads <span className="ml-1 text-xs opacity-75">({wardRoads.length})</span>
+        </Link>
       </nav>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* TAB: Roads (MP / county / national projects in this ward)            */}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {activeTab === 'roads' && (() => {
+        const villageName = new Map(villageRows.map((v) => [v.id, v.name]));
+        const STATUS: Record<string, string> = {
+          completed: 'bg-brand-success/15 text-brand-success border-brand-success/40',
+          ongoing: 'bg-brand-skyBlue/15 text-brand-skyBlue border-brand-skyBlue/40',
+          operational: 'bg-brand-teal/15 text-brand-teal border-brand-teal/40',
+          proposed: 'bg-brand-gold/15 text-brand-burnt border-brand-gold/50',
+          stalled: 'bg-brand-danger/15 text-brand-danger border-brand-danger/40',
+        };
+        const FUND: Record<string, string> = { ng_cdf: 'NG-CDF', county: 'County', national: 'National', other: 'Other' };
+        const sourceUrl = (notes: string | null) => notes?.match(/https?:\/\/\S+/)?.[0]?.replace(/[).]+$/, '') ?? null;
+        return (
+          <div className="mt-6 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-bold text-brand-textActive">Roads in {ward.name}</h2>
+                <p className="text-sm text-brand-textMuted">
+                  MP, NG-CDF, county &amp; national road projects. Constituency-wide trunk roads show in every ward.
+                </p>
+              </div>
+              <Link href="/roads" className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-md bg-brand-orangePrimary text-white hover:bg-brand-orangeBright transition">
+                + Add / manage roads
+              </Link>
+            </div>
+            {wardRoads.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-brand-border bg-brand-cardBg p-8 text-center text-sm text-brand-textMuted">
+                No roads recorded for this ward yet. <Link href="/roads" className="text-brand-aqua hover:underline">Add the MP&apos;s road projects →</Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {wardRoads.map((r) => {
+                  const src = sourceUrl(r.notes);
+                  const cleanNotes = r.notes?.replace(/\s*Source:\s*https?:\/\/\S+/i, '').replace(/\s*\[seeded\]\s*/i, '').trim();
+                  return (
+                    <div key={r.id} className="rounded-xl border border-brand-border bg-brand-cardBg p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-bold text-brand-textActive">🛣️ {r.name}</div>
+                          <div className="text-xs text-brand-textMuted mt-0.5">
+                            {r.wardId == null && <span className="text-brand-teal font-semibold">Constituency-wide</span>}
+                            {r.fromVillageId && villageName.get(r.fromVillageId)}
+                            {r.fromVillageId && r.toVillageId && ' → '}
+                            {r.toVillageId && villageName.get(r.toVillageId)}
+                            {r.lengthKm && <span> · {r.lengthKm} km</span>}
+                            {r.surface && <span> · {r.surface}</span>}
+                          </div>
+                          {cleanNotes && <p className="text-xs text-brand-textBody mt-2">{cleanNotes}</p>}
+                          {src && <a href={src} target="_blank" rel="noopener noreferrer" className="text-[11px] text-brand-aqua hover:text-brand-skyBlue underline">Source ↗</a>}
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {r.status && <span className={`text-[10px] uppercase font-bold border rounded px-2 py-0.5 ${STATUS[r.status] ?? 'border-brand-border text-brand-textMuted'}`}>{r.status}</span>}
+                          {r.funding && <span className="text-[10px] uppercase font-bold text-brand-teal">{FUND[r.funding] ?? r.funding}</span>}
+                          {r.mpProject && <span className="text-[10px] uppercase font-bold text-brand-orangeBright">MP project</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
