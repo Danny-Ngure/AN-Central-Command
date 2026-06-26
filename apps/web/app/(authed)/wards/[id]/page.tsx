@@ -199,6 +199,7 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
   if (!data) notFound();
 
   const { ward, demo, stationVoterCounts, stations, sites, leaders, villageRows, wardTeam, wardMembers, siblingWards, wardRoads } = data;
+  const mpRoadCount = wardRoads.filter((r) => r.mpProject).length;
   const wardCoordinator = wardTeam.find((t) => t.role === 'ward_coordinator') ?? null;
   const wardAssistants = wardTeam.filter((t) => t.role === 'assistant_ward_coordinator');
 
@@ -370,7 +371,7 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
               : 'border-transparent text-brand-textMuted hover:text-brand-textActive hover:border-brand-border',
           ].join(' ')}
         >
-          🛣️ Roads <span className="ml-1 text-xs opacity-75">({wardRoads.length})</span>
+          🛣️ Roads <span className="ml-1 text-xs opacity-75">({mpRoadCount})</span>
         </Link>
       </nav>
 
@@ -388,6 +389,36 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
         };
         const FUND: Record<string, string> = { ng_cdf: 'NG-CDF', county: 'County', national: 'National', other: 'Other' };
         const sourceUrl = (notes: string | null) => notes?.match(/https?:\/\/\S+/)?.[0]?.replace(/[).]+$/, '') ?? null;
+        const mpRoads = wardRoads.filter((r) => r.mpProject);
+        const otherRoads = wardRoads.filter((r) => !r.mpProject);
+        const renderRoad = (r: typeof wardRoads[number]) => {
+          const src = sourceUrl(r.notes);
+          const cleanNotes = r.notes?.replace(/\s*Source:\s*https?:\/\/\S+/i, '').replace(/\s*\[seeded\]\s*/i, '').trim();
+          return (
+            <div key={r.id} className="rounded-xl border border-brand-border bg-brand-cardBg p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-bold text-brand-textActive">🛣️ {r.name}</div>
+                  <div className="text-xs text-brand-textMuted mt-0.5">
+                    {r.wardId == null && <span className="text-brand-teal font-semibold">Constituency-wide</span>}
+                    {r.fromVillageId && villageName.get(r.fromVillageId)}
+                    {r.fromVillageId && r.toVillageId && ' → '}
+                    {r.toVillageId && villageName.get(r.toVillageId)}
+                    {r.lengthKm && <span> · {r.lengthKm} km</span>}
+                    {r.surface && <span> · {r.surface}</span>}
+                  </div>
+                  {cleanNotes && <p className="text-xs text-brand-textBody mt-2">{cleanNotes}</p>}
+                  {src && <a href={src} target="_blank" rel="noopener noreferrer" className="text-[11px] text-brand-aqua hover:text-brand-skyBlue underline">Source ↗</a>}
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  {r.status && <span className={`text-[10px] uppercase font-bold border rounded px-2 py-0.5 ${STATUS[r.status] ?? 'border-brand-border text-brand-textMuted'}`}>{r.status}</span>}
+                  {r.funding && <span className="text-[10px] uppercase font-bold text-brand-teal">{FUND[r.funding] ?? r.funding}</span>}
+                  {r.mpProject && <span className="text-[10px] uppercase font-bold text-brand-orangeBright">MP project</span>}
+                </div>
+              </div>
+            </div>
+          );
+        };
         return (
           <div className="mt-6 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -401,41 +432,25 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
                 + Add / manage roads
               </Link>
             </div>
-            {wardRoads.length === 0 ? (
+            {/* MP / NG-CDF roads — the list the MP is responsible for */}
+            {mpRoads.length === 0 ? (
               <div className="rounded-xl border border-dashed border-brand-border bg-brand-cardBg p-8 text-center text-sm text-brand-textMuted">
-                No roads recorded for this ward yet. <Link href="/roads" className="text-brand-aqua hover:underline">Add the MP&apos;s road projects →</Link>
+                No MP / NG-CDF roads recorded for this ward yet.{' '}
+                <Link href="/roads" className="text-brand-aqua hover:underline">Add them →</Link>
+                <div className="mt-2 text-[11px]">Add from the NG-CDF Nyali constituency project list (no public named-road list exists online).</div>
               </div>
             ) : (
-              <div className="space-y-2">
-                {wardRoads.map((r) => {
-                  const src = sourceUrl(r.notes);
-                  const cleanNotes = r.notes?.replace(/\s*Source:\s*https?:\/\/\S+/i, '').replace(/\s*\[seeded\]\s*/i, '').trim();
-                  return (
-                    <div key={r.id} className="rounded-xl border border-brand-border bg-brand-cardBg p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-bold text-brand-textActive">🛣️ {r.name}</div>
-                          <div className="text-xs text-brand-textMuted mt-0.5">
-                            {r.wardId == null && <span className="text-brand-teal font-semibold">Constituency-wide</span>}
-                            {r.fromVillageId && villageName.get(r.fromVillageId)}
-                            {r.fromVillageId && r.toVillageId && ' → '}
-                            {r.toVillageId && villageName.get(r.toVillageId)}
-                            {r.lengthKm && <span> · {r.lengthKm} km</span>}
-                            {r.surface && <span> · {r.surface}</span>}
-                          </div>
-                          {cleanNotes && <p className="text-xs text-brand-textBody mt-2">{cleanNotes}</p>}
-                          {src && <a href={src} target="_blank" rel="noopener noreferrer" className="text-[11px] text-brand-aqua hover:text-brand-skyBlue underline">Source ↗</a>}
-                        </div>
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                          {r.status && <span className={`text-[10px] uppercase font-bold border rounded px-2 py-0.5 ${STATUS[r.status] ?? 'border-brand-border text-brand-textMuted'}`}>{r.status}</span>}
-                          {r.funding && <span className="text-[10px] uppercase font-bold text-brand-teal">{FUND[r.funding] ?? r.funding}</span>}
-                          {r.mpProject && <span className="text-[10px] uppercase font-bold text-brand-orangeBright">MP project</span>}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <div className="space-y-2">{mpRoads.map(renderRoad)}</div>
+            )}
+
+            {/* Non-MP roads (national / county) kept separate, collapsed */}
+            {otherRoads.length > 0 && (
+              <details className="rounded-xl border border-brand-border/60 bg-brand-cardBgHeavy/40">
+                <summary className="cursor-pointer select-none px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-brand-textMuted">
+                  Other agencies — national / county roads ({otherRoads.length}) · not the MP
+                </summary>
+                <div className="p-3 pt-0 space-y-2">{otherRoads.map(renderRoad)}</div>
+              </details>
             )}
           </div>
         );
