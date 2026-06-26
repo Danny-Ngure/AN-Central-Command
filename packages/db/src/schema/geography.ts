@@ -86,6 +86,9 @@ export const villages = pgTable(
       onDelete: 'set null',
     }),
     name: text('name').notNull(),
+    // Arbitrary-but-geographic grouping of a ward's villages into named clusters
+    // (e.g. "Bamburi", "Bullo") for field planning + coordinator assignment.
+    section: text('section'),
     aliases: text('aliases').array(),              // alternate spellings, swahili names
     // Boundaries are approximate for informal settlements (SRS BR-010.1).
     // Always have a centroid; polygon optional. UI must surface uncertainty.
