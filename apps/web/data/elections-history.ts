@@ -1,112 +1,96 @@
 // Historical MP election results for Nyali Constituency, 2013 / 2017 / 2022.
-// Source: IEBC official tallies; per-ward breakdowns from
-//   docs/Nyali MP Results 2013-2022.pdf
 //
-// All figures are official except where the PDF source explicitly approximates
-// ("~5,400" etc.) — flagged with `approximate: true` and rendered with the
-// "~" prefix in the UI to keep our presentation honest.
+// VERIFIED against IEBC declarations + reputable Kenyan news (sources cited per
+// cycle below). Principles:
+//   • Where an official per-candidate tally could not be sourced, `votes` is
+//     `null` — we do NOT estimate or invent numbers.
+//   • A cycle is `complete` only when the FULL official slate is loaded; only
+//     then is vote-share reliable.
+//   • There is no published per-ward breakdown at MP level, so we don't show one.
+//
+// Earlier versions of this file contained fabricated candidates (e.g. Suleiman
+// Shahbal — who actually ran for Mombasa Governor in 2013 — and Shariff Nassir,
+// who died in 2005) and invented per-ward tallies. Those have been removed.
 
 export interface HistoricalCandidate {
   name: string;
   party: string;
-  votes: number;
+  votes: number | null;        // null = official tally not yet sourced
   isWinner?: boolean;
-}
-
-export interface HistoricalWardResult {
-  // Vote totals per ward — approximate per the source PDF.
-  Frere_Town:      { winner: number; runnerUp: number; others: number };
-  Ziwa_La_Ngombe:  { winner: number; runnerUp: number; others: number };
-  Mkomani:         { winner: number; runnerUp: number; others: number };
-  Kongowea:        { winner: number; runnerUp: number; others: number };
-  Kadzandani:      { winner: number; runnerUp: number; others: number };
 }
 
 export interface HistoricalElection {
   year: number;
   candidates: HistoricalCandidate[];
-  perWard: HistoricalWardResult;
-  perWardApproximate: true;  // PDF source uses "~" approximations
-  summary: string[];
+  /** true when every candidate's official vote count is loaded (share is reliable) */
+  complete: boolean;
+  /** true when only the leading candidate(s) are itemised */
+  partial?: boolean;
+  source: string;              // primary source URL
+  sourceLabel: string;
+  notes: string[];
 }
 
 export const HISTORICAL_ELECTIONS: HistoricalElection[] = [
   {
     year: 2013,
     candidates: [
-      { name: 'Hezron Awiti Bollo',      party: 'WDM-K',       votes: 19903, isWinner: true },
-      { name: 'Suleiman Shahbal',        party: 'URP',         votes: 15804 },
-      { name: 'Omar Mwinyi Shimbwa',     party: 'ODM',         votes: 10485 },
-      { name: 'Mohammed Amir Khamis',    party: 'TNA',         votes:  7154 },
-      { name: 'Saido Hamisi Mwaruwa',    party: 'Independent', votes:  2742 },
-      { name: 'Mbarak Juma Mbarak',      party: 'KNC',         votes:  1126 },
-      { name: 'Shariff Nassir Ali',      party: 'Independent', votes:   803 },
-      { name: 'Hassan Mwangeka Charo',   party: 'Independent', votes:   393 },
+      { name: 'Hezron Awiti Bollo', party: 'WDM-K (Wiper)', votes: null, isWinner: true },
+      { name: 'John Mcharo',        party: 'ODM',           votes: null },
     ],
-    perWardApproximate: true,
-    perWard: {
-      Frere_Town:     { winner: 4200, runnerUp: 3100, others: 1500 },
-      Ziwa_La_Ngombe: { winner: 3600, runnerUp: 2800, others: 1500 }, // PDF: "ODM split vote among others"
-      Mkomani:        { winner: 4000, runnerUp: 2900, others: 1200 },
-      Kongowea:       { winner: 5200, runnerUp: 3400, others: 1800 },
-      Kadzandani:     { winner: 2900, runnerUp: 3600, others: 1000 }, // runnerUp (Shahbal) actually won this ward
-    },
-    summary: [
-      'Closest race in Nyali history.',
-      'Kadzandani leaned anti-incumbent (Shahbal/URP strong).',
-      'Awiti won overall through Frere Town + Kongowea strength.',
+    complete: false,
+    partial: true,
+    source: 'https://en.wikipedia.org/wiki/Hezron_Awiti_Bollo',
+    sourceLabel: 'Wikipedia · The Star',
+    notes: [
+      'Hezron Awiti Bollo (Wiper / WDM-K) won the first-ever Nyali MP election.',
+      'Runner-up was John Mcharo (ODM), former Mombasa deputy mayor — Awiti had lost the ODM primary to him and ran on Wiper.',
+      'Official IEBC per-candidate vote tallies for 2013 are not yet loaded — only the confirmed winner and runner-up are shown.',
     ],
   },
   {
     year: 2017,
     candidates: [
       { name: 'Mohamed Ali (Jicho Pevu)', party: 'Independent', votes: 26798, isWinner: true },
-      { name: 'Said Abdalla Salim',       party: 'ODM',         votes: 13986 },
-      { name: 'Ashraf Hassan Awadh',      party: 'Jubilee',     votes:  9735 },
-      { name: 'John Charles Mcharo',      party: 'Wiper',       votes:  2938 },
-      { name: "Daniel Ongong'a Abwao",    party: 'Independent', votes:  1143 },
+      { name: 'Said Abdalla',             party: 'ODM',         votes: 16473 },
     ],
-    perWardApproximate: true,
-    perWard: {
-      Frere_Town:     { winner: 5400, runnerUp: 2900, others: 1000 },
-      Ziwa_La_Ngombe: { winner: 4800, runnerUp: 2600, others:  900 },
-      Mkomani:        { winner: 5100, runnerUp: 2700, others:  800 },
-      Kongowea:       { winner: 7500, runnerUp: 3200, others: 1200 },
-      Kadzandani:     { winner: 4000, runnerUp: 1900, others:  500 }, // PDF doesn't list others, estimated
-    },
-    summary: [
-      'Mohamed Ali dominated all wards as an Independent.',
-      'Kongowea gave him the largest margin.',
-      'Jubilee took a strong third — Awadh ~9.7k across the constituency.',
+    complete: false,
+    partial: true,
+    source: 'https://www.kenyans.co.ke/news/mohamed-ali-quits-odm-vie-independent-candidate-nyali-parliamentary-seat-18876',
+    sourceLabel: 'Kenyans.co.ke · The Star',
+    notes: [
+      'Mohamed Ali won as an Independent with 26,798 votes after losing the ODM primary to Said Abdalla.',
+      'Said Abdalla (ODM) was runner-up with 16,473 votes.',
+      'There were ~13 other minor candidates; their official tallies are not itemised here, so constituency vote-share is not computed for 2017.',
     ],
   },
   {
     year: 2022,
     candidates: [
-      { name: 'Mohamed Ali (Jicho Pevu)', party: 'UDA',     votes: 32933, isWinner: true },
-      { name: 'Said Abdallah',            party: 'ODM',     votes: 18642 },
+      { name: 'Mohamed Ali (Jicho Pevu)', party: 'UDA',         votes: 32933, isWinner: true },
+      { name: 'Said Abdallah',            party: 'ODM',         votes: 18642 },
       { name: 'Eric Gitonga Stanley',     party: 'Independent', votes:  1135 },
-      { name: 'Millicent Atieno Odhiambo', party: 'Wiper',  votes:   904 },
-      { name: 'Yasir Noor Mohamed',       party: 'Jubilee', votes:   889 },
+      { name: 'Millicent Atieno Odhiambo', party: 'Wiper',      votes:   904 },
+      { name: 'Yasir Noor Mohamed',       party: 'Jubilee',     votes:   889 },
+      { name: 'Japheth Marine Otieno',    party: 'Independent', votes:   601 },
+      { name: 'Ferdinand Katana',         party: 'Kadu Asili',  votes:   264 },
+      { name: 'Joshua Otieno Ndere',      party: 'Independent', votes:   166 },
+      { name: 'Edward Mark Osewe',        party: 'PAA',         votes:   124 },
     ],
-    perWardApproximate: true,
-    perWard: {
-      Frere_Town:     { winner: 6800, runnerUp: 4100, others: 300 },
-      Ziwa_La_Ngombe: { winner: 5900, runnerUp: 3600, others: 250 },
-      Mkomani:        { winner: 6400, runnerUp: 3700, others: 300 },
-      Kongowea:       { winner: 9200, runnerUp: 4900, others: 400 },
-      Kadzandani:     { winner: 4600, runnerUp: 2300, others: 200 },
-    },
-    summary: [
-      'Strongest UDA ward: Kongowea.',
-      'Most competitive: Frere Town & Mkomani.',
-      'ODM strongest in Ziwa la Ng\'ombe relative share.',
+    complete: true,
+    source: 'https://www.kenyanews.go.ke/nyali-mp-retains-his-seat-with-landslide-victory/',
+    sourceLabel: 'Kenya News Agency (IEBC declaration)',
+    notes: [
+      'Mohamed Ali (UDA) retained the seat with 32,933 votes — ~59% of valid votes.',
+      'Said Abdallah (ODM) was runner-up with 18,642.',
+      'Full official 9-candidate slate as declared by the IEBC returning officer.',
     ],
   },
 ];
 
 // ---- Strategic ward profile -------------------------------------------------
-// Derived from the 2013-2022 dataset — captures how each ward behaves politically.
+// Qualitative behaviour notes (not derived from vote tallies). Treat as field
+// intelligence to validate, not as hard election data.
 
 export interface WardProfile {
   name: string;
@@ -116,18 +100,19 @@ export interface WardProfile {
 }
 
 export const WARD_PROFILES: WardProfile[] = [
-  { name: 'Kongowea',        behaviour: 'powerhouse',    oneLiner: 'Vote powerhouse',         note: 'Largest swing ward — turnout here decides the constituency. Top vote-getter every cycle.' },
-  { name: 'Frere Town',      behaviour: 'swing',         oneLiner: 'Swing ward',              note: 'Margins narrow. Where the campaign is won or lost.' },
-  { name: 'Ziwa La Ng\'ombe', behaviour: 'odm_leaning',  oneLiner: 'ODM-friendly',            note: 'Highest ODM share relative to constituency average across all three cycles.' },
-  { name: 'Kadzandani',      behaviour: 'mixed',         oneLiner: 'Most politically mixed',  note: 'Flipped between URP (2013) and UDA (2017+). Cross-pressure ward — economic + ethnic axes both active.' },
-  { name: 'Mkomani',         behaviour: 'stable_middle', oneLiner: 'Stable middle ground',    note: 'Most predictable ward. Tracks the constituency winner without big swings.' },
+  { name: 'Kongowea',        behaviour: 'powerhouse',    oneLiner: 'Vote powerhouse',         note: 'Largest, most populous ward — turnout here weighs heavily on the constituency result.' },
+  { name: 'Frere Town',      behaviour: 'swing',         oneLiner: 'Swing ward',              note: 'Mixed, competitive ward — worth close attention in any campaign.' },
+  { name: 'Ziwa La Ng\'ombe', behaviour: 'odm_leaning',  oneLiner: 'ODM-friendly',            note: 'Historically receptive to ODM messaging (qualitative — confirm on the ground).' },
+  { name: 'Kadzandani',      behaviour: 'mixed',         oneLiner: 'Most politically mixed',  note: 'Cross-pressured ward where party loyalties are not fixed.' },
+  { name: 'Mkomani',         behaviour: 'stable_middle', oneLiner: 'Stable middle ground',    note: 'Includes the Nyali estate; tends to track the overall constituency mood.' },
 ];
 
 // ---- Constituency-wide aggregate trends -------------------------------------
+// Computed ONLY for cycles with a complete official slate (so share is real).
 
 export interface CycleTrend {
   year: number;
-  totalValidVotes: number;     // sum of candidates' votes
+  totalValidVotes: number;
   winnerVotes: number;
   winnerShare: number;          // %
   runnerUpVotes: number;
@@ -135,16 +120,19 @@ export interface CycleTrend {
   winningMargin: number;
 }
 
-export const CYCLE_TRENDS: CycleTrend[] = HISTORICAL_ELECTIONS.map((e) => {
-  const total = e.candidates.reduce((s, c) => s + c.votes, 0);
-  const sorted = [...e.candidates].sort((a, b) => b.votes - a.votes);
-  return {
-    year: e.year,
-    totalValidVotes: total,
-    winnerVotes: sorted[0]!.votes,
-    winnerShare: (sorted[0]!.votes / total) * 100,
-    runnerUpVotes: sorted[1]!.votes,
-    runnerUpShare: (sorted[1]!.votes / total) * 100,
-    winningMargin: sorted[0]!.votes - sorted[1]!.votes,
-  };
-});
+export const CYCLE_TRENDS: CycleTrend[] = HISTORICAL_ELECTIONS
+  .filter((e) => e.complete && e.candidates.every((c) => c.votes != null))
+  .map((e) => {
+    const cs = e.candidates as Array<HistoricalCandidate & { votes: number }>;
+    const total = cs.reduce((s, c) => s + c.votes, 0);
+    const sorted = [...cs].sort((a, b) => b.votes - a.votes);
+    return {
+      year: e.year,
+      totalValidVotes: total,
+      winnerVotes: sorted[0]!.votes,
+      winnerShare: (sorted[0]!.votes / total) * 100,
+      runnerUpVotes: sorted[1]!.votes,
+      runnerUpShare: (sorted[1]!.votes / total) * 100,
+      winningMargin: sorted[0]!.votes - sorted[1]!.votes,
+    };
+  });

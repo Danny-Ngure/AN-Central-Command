@@ -12,7 +12,6 @@ import {
   WARD_PROFILES,
   CYCLE_TRENDS,
   type HistoricalElection,
-  type HistoricalWardResult,
 } from '@/data/elections-history';
 import { CURRENT_POLLS, computePollAverage } from '@/data/current-polls';
 
@@ -165,67 +164,55 @@ function TabPollings() {
 // ─── TAB: Historical overview ─────────────────────────────────────────────────
 
 function TabHistory() {
+  // Winner votes are only charted for cycles where the figure is sourced.
+  const winnerVoteBars = HISTORICAL_ELECTIONS
+    .map((e) => ({ year: e.year, w: e.candidates.find((c) => c.isWinner) }))
+    .filter((x) => x.w?.votes != null)
+    .map((x, i) => ({
+      label: String(x.year),
+      value: x.w!.votes as number,
+      color: ['#00ccff', '#ff6600', '#0d4c5c'][i] ?? '#025e73',
+      hint: `${(x.w!.votes as number).toLocaleString()} votes`,
+    }));
+
   return (
     <div className="space-y-5">
+      <div className="rounded-lg border border-brand-skyBlue/40 bg-brand-skyBlue/10 px-4 py-2.5 text-xs text-brand-textBody">
+        ℹ️ Figures are verified against IEBC declarations &amp; Kenyan news (sources on each cycle tab).
+        Where official tallies aren&apos;t yet sourced (2013, and the minor 2017 candidates), numbers are shown as
+        <strong> not loaded</strong> rather than estimated.
+      </div>
+
       {/* Winner cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {HISTORICAL_ELECTIONS.map((e) => {
-          const trend = CYCLE_TRENDS.find((t) => t.year === e.year)!;
+          const trend = CYCLE_TRENDS.find((t) => t.year === e.year);
           const winner = e.candidates.find((c) => c.isWinner)!;
+          const runnerUp = e.candidates.find((c) => !c.isWinner);
           return (
             <div key={e.year} className="rounded-xl border border-brand-border bg-brand-cardBg p-4">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-brand-textMuted">
-                {e.year} winner
-              </div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-brand-textMuted">{e.year} winner</div>
               <div className="text-base font-extrabold text-brand-textActive mt-1">{winner.name}</div>
               <div className="text-xs text-brand-textMuted">{winner.party}</div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                <Mini label="Votes" value={winner.votes.toLocaleString()} />
-                <Mini label="Share" value={`${trend.winnerShare.toFixed(1)}%`} />
-                <Mini label="Total valid" value={trend.totalValidVotes.toLocaleString()} />
-                <Mini label="Margin" value={trend.winningMargin.toLocaleString()} />
+                <Mini label="Votes" value={winner.votes != null ? winner.votes.toLocaleString() : 'Not loaded'} />
+                <Mini label="Share" value={trend ? `${trend.winnerShare.toFixed(1)}%` : '—'} />
+                <Mini label="Runner-up" value={runnerUp?.name ?? '—'} />
+                <Mini label="Margin" value={trend ? trend.winningMargin.toLocaleString() : '—'} />
               </div>
+              <a href={e.source} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[10px] text-brand-aqua hover:text-brand-skyBlue underline">
+                Source: {e.sourceLabel} ↗
+              </a>
             </div>
           );
         })}
       </div>
 
-      <ChartCard title="Winner vote share by cycle" subtitle="% of total valid votes captured by the eventual MP">
-        {/* Each cycle gets its own brand colour so the year-over-year growth pops. */}
-        <BarChart
-          yAxisLabel="Winner share %"
-          className="max-w-lg"
-          bars={[
-            { label: '2013', value: CYCLE_TRENDS[0]!.winnerShare, color: '#0d4c5c', hint: `${CYCLE_TRENDS[0]!.winnerVotes.toLocaleString()} votes` },
-            { label: '2017', value: CYCLE_TRENDS[1]!.winnerShare, color: '#00ccff', hint: `${CYCLE_TRENDS[1]!.winnerVotes.toLocaleString()} votes` },
-            { label: '2022', value: CYCLE_TRENDS[2]!.winnerShare, color: '#ff6600', hint: `${CYCLE_TRENDS[2]!.winnerVotes.toLocaleString()} votes` },
-          ]}
-        />
+      <ChartCard title="Winner votes by cycle" subtitle="official tally of the eventual MP (only where sourced)">
+        <BarChart yAxisLabel="Winner votes" className="max-w-lg" bars={winnerVoteBars} />
         <Caption>
-          Winners' share climbed steadily across cycles — 34% (2013) → 49% (2017) → 60% (2022).
-          The race has become <strong>less fragmented over time</strong>; 2027 likely continues that pattern
-          if the top 2-3 candidates consolidate.
-        </Caption>
-      </ChartCard>
-
-      <ChartCard title="Top 3 candidates by cycle" subtitle="raw vote totals (winner / runner-up / 3rd)">
-        <GroupedBarChart
-          yAxisLabel="Votes"
-          className="max-w-5xl"
-          groups={['2013', '2017', '2022']}
-          series={[
-            { label: 'Winner',    color: COLORS.teal,  values: CYCLE_TRENDS.map((t) => t.winnerVotes) },
-            { label: 'Runner-up', color: COLORS.amber, values: CYCLE_TRENDS.map((t) => t.runnerUpVotes) },
-            {
-              label: '3rd place',
-              color: COLORS.aqua,
-              values: HISTORICAL_ELECTIONS.map((e) => e.candidates[2]?.votes ?? 0),
-            },
-          ]}
-        />
-        <Caption>
-          Total turnout grew each cycle. Mohamed Ali (2017+ winner) more than doubled the runner-up
-          on every count — that dominance is unusual and is what the current opinion polls suggest is shifting.
+          Mohamed Ali grew his tally from 26,798 (2017, Independent) to 32,933 (2022, UDA). The 2013
+          figure isn&apos;t charted because the official tally hasn&apos;t been loaded yet.
         </Caption>
       </ChartCard>
     </div>
@@ -235,116 +222,92 @@ function TabHistory() {
 // ─── TAB: Per-cycle (2013 / 2017 / 2022) ──────────────────────────────────────
 
 function TabCycle({ election }: { election: HistoricalElection }) {
-  const trend = CYCLE_TRENDS.find((t) => t.year === election.year)!;
+  const trend = CYCLE_TRENDS.find((t) => t.year === election.year);
   const winner = election.candidates.find((c) => c.isWinner)!;
-  const topN = election.candidates.slice(0, 8);
-  const wardNames: (keyof HistoricalWardResult)[] = [
-    'Frere_Town', 'Kongowea', 'Mkomani', 'Ziwa_La_Ngombe', 'Kadzandani',
-  ];
-  const wardLabels: Record<keyof HistoricalWardResult, string> = {
-    Frere_Town: 'Frere Town',
-    Kongowea: 'Kongowea',
-    Mkomani: 'Mkomani',
-    Ziwa_La_Ngombe: "Ziwa La Ng'ombe",
-    Kadzandani: 'Kadzandani',
-  };
-  const runnerUp = election.candidates.find((c) => !c.isWinner)!;
+  const runnerUp = election.candidates.find((c) => !c.isWinner);
+  const hasVotes = election.candidates.every((c) => c.votes != null);
+  const maxVotes = Math.max(...election.candidates.map((c) => c.votes ?? 0), 1);
 
   return (
     <div className="space-y-5">
+      {/* Data-completeness banner */}
+      <div className={[
+        'rounded-lg border px-4 py-2.5 text-xs',
+        election.complete
+          ? 'border-brand-success/40 bg-brand-success/10 text-brand-textBody'
+          : 'border-brand-gold/50 bg-brand-gold/10 text-brand-textBody',
+      ].join(' ')}>
+        {election.complete
+          ? '✓ Full official slate loaded (IEBC declaration).'
+          : '⚠ Partial data — only the confirmed leading candidates are shown; official tallies for the rest are not yet loaded.'}
+        {' '}
+        <a href={election.source} target="_blank" rel="noopener noreferrer" className="text-brand-aqua hover:text-brand-skyBlue underline">
+          Source: {election.sourceLabel} ↗
+        </a>
+      </div>
+
       {/* Headline strip */}
       <div className="rounded-xl border border-brand-border bg-brand-cardBg p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
         <Mini label={`${election.year} winner`} value={winner.name} />
         <Mini label="Party" value={winner.party} />
-        <Mini label="Votes" value={winner.votes.toLocaleString()} />
-        <Mini label="Share" value={`${trend.winnerShare.toFixed(1)}%`} />
+        <Mini label="Votes" value={winner.votes != null ? winner.votes.toLocaleString() : 'Not loaded'} />
+        <Mini label="Share" value={trend ? `${trend.winnerShare.toFixed(1)}%` : '—'} />
       </div>
 
-      {/* Top candidates horizontal bars */}
-      <ChartCard title={`${election.year} candidates — vote share`} subtitle="full slate (top 8 by votes)">
-        <div className="max-w-5xl">
-          <HorizontalBarChart
-            max={Math.max(50, Math.ceil((winner.votes / trend.totalValidVotes) * 100 / 5) * 5)}
-            bars={topN.map((c, i) => ({
-              label: c.name,
-              value: (c.votes / trend.totalValidVotes) * 100,
-              color: c.isWinner ? COLORS.teal : i === 1 ? COLORS.amber : i === 2 ? COLORS.aqua : COLORS.neutral,
-              highlight: c.isWinner,
-              sublabel: `${c.party} · ${c.votes.toLocaleString()} votes`,
-            }))}
-          />
-        </div>
-        <Caption>
-          <strong>{winner.name}</strong> ({winner.party}) won with {trend.winnerShare.toFixed(1)}%;{' '}
-          runner-up <strong>{runnerUp.name}</strong> ({runnerUp.party}) on {trend.runnerUpShare.toFixed(1)}%.
-          Margin: <strong>{trend.winningMargin.toLocaleString()}</strong> votes.
-        </Caption>
-      </ChartCard>
-
-      {/* Per-ward grouped bar */}
+      {/* Candidates */}
       <ChartCard
-        title={`${election.year} ward-by-ward (approx)`}
-        subtitle="winner · runner-up · others — from the PDF appendix"
+        title={`${election.year} candidates`}
+        subtitle={hasVotes ? 'official votes (bar length = votes)' : 'confirmed candidates — official tallies not yet loaded'}
       >
-        <GroupedBarChart
-          yAxisLabel="Votes (~)"
-          className="max-w-5xl"
-          groups={wardNames.map((k) => wardLabels[k])}
-          series={[
-            {
-              label: `${winner.party} (winner)`,
-              color: COLORS.teal,
-              values: wardNames.map((k) => election.perWard[k].winner),
-            },
-            {
-              label: `${runnerUp.party} (runner-up)`,
-              color: COLORS.amber,
-              values: wardNames.map((k) => election.perWard[k].runnerUp),
-            },
-            {
-              label: 'Others',
-              color: COLORS.neutral,
-              values: wardNames.map((k) => election.perWard[k].others),
-            },
-          ]}
-        />
+        {hasVotes ? (
+          <div className="max-w-5xl">
+            <HorizontalBarChart
+              max={Math.ceil(maxVotes / 5000) * 5000}
+              bars={election.candidates.map((c, i) => ({
+                label: c.name,
+                value: c.votes as number,
+                color: c.isWinner ? COLORS.teal : i === 1 ? COLORS.amber : i === 2 ? COLORS.aqua : COLORS.neutral,
+                highlight: c.isWinner,
+                sublabel: `${c.party} · ${(c.votes as number).toLocaleString()} votes`,
+              }))}
+            />
+          </div>
+        ) : (
+          <ul className="space-y-2 max-w-2xl">
+            {election.candidates.map((c) => (
+              <li key={c.name} className="flex items-center justify-between gap-3 rounded-lg border border-brand-border bg-brand-cardBgHeavy/40 px-3 py-2">
+                <div>
+                  <span className="text-sm font-semibold text-brand-textActive">{c.name}</span>
+                  <span className="text-xs text-brand-textMuted"> · {c.party}</span>
+                </div>
+                <span className={`text-[10px] uppercase font-bold tracking-wider ${c.isWinner ? 'text-brand-success' : 'text-brand-textMuted'}`}>
+                  {c.isWinner ? 'Winner' : 'Runner-up'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <Caption>
-          {ward2022Note(election.year, election.perWard)}
+          {trend ? (
+            <><strong>{winner.name}</strong> ({winner.party}) won with {trend.winnerShare.toFixed(1)}%; runner-up <strong>{runnerUp?.name}</strong> ({runnerUp?.party}) on {trend.runnerUpShare.toFixed(1)}%. Margin: <strong>{trend.winningMargin.toLocaleString()}</strong> votes.</>
+          ) : winner.votes != null && runnerUp?.votes != null ? (
+            <><strong>{winner.name}</strong> ({winner.party}) beat <strong>{runnerUp.name}</strong> ({runnerUp.party}) by <strong>{(winner.votes - runnerUp.votes).toLocaleString()}</strong> votes. Constituency-wide share isn&apos;t shown because the full slate isn&apos;t loaded.</>
+          ) : (
+            <><strong>{winner.name}</strong> ({winner.party}) won; runner-up <strong>{runnerUp?.name}</strong> ({runnerUp?.party}). Official vote tallies for this cycle are not yet loaded.</>
+          )}
         </Caption>
       </ChartCard>
 
-      {/* Cycle commentary from PDF */}
-      <ChartCard title={`${election.year} summary`} subtitle="from the IEBC results PDF">
+      {/* Notes */}
+      <ChartCard title={`${election.year} notes`} subtitle="verified facts &amp; data caveats">
         <ul className="text-sm text-brand-textBody space-y-1">
-          {election.summary.map((s, i) => (
+          {election.notes.map((s, i) => (
             <li key={i} className="flex gap-2">
               <span className="text-brand-orangeBright">›</span>
               <span>{s}</span>
             </li>
           ))}
         </ul>
-      </ChartCard>
-
-      {/* Donut: winner's contribution by ward */}
-      <ChartCard
-        title={`${election.year} — where the winner's votes came from`}
-        subtitle="approximate ward share of winner's total"
-      >
-        <Pie
-          donut
-          size={180}
-          centerText={`${winner.votes.toLocaleString()}`}
-          centerSubText="total votes"
-          data={wardNames.map((k, i) => ({
-            label: wardLabels[k],
-            value: election.perWard[k].winner,
-            color: [COLORS.teal, COLORS.amber, COLORS.aqua, COLORS.sky, COLORS.emerald][i] ?? COLORS.neutral,
-          }))}
-        />
-        <Caption>
-          The donut shows roughly which wards built the {election.year} winner's coalition.
-          Kongowea is the perennial vote powerhouse in every cycle.
-        </Caption>
       </ChartCard>
     </div>
   );
@@ -615,15 +578,3 @@ function behaviourBadgeClass(b: string): string {
   }
 }
 
-function ward2022Note(year: number, perWard: HistoricalWardResult): string {
-  if (year === 2022) {
-    return `Strongest UDA ward: Kongowea (${perWard.Kongowea.winner.toLocaleString()} votes). Most competitive margins: Frere Town & Mkomani. ODM held best in Ziwa La Ng'ombe relatively.`;
-  }
-  if (year === 2017) {
-    return `Mohamed Ali (Independent) dominated all five wards; Kongowea gave him the largest margin (${perWard.Kongowea.winner.toLocaleString()} - ${perWard.Kongowea.runnerUp.toLocaleString()} = ${(perWard.Kongowea.winner - perWard.Kongowea.runnerUp).toLocaleString()} vote lead).`;
-  }
-  if (year === 2013) {
-    return `Kadzandani actually flipped — Shahbal (URP) edged Awiti (WDM-K) here. Awiti won the constituency on Frere Town + Kongowea strength.`;
-  }
-  return '';
-}
