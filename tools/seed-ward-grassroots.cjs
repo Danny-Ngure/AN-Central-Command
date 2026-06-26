@@ -20,6 +20,7 @@ const sql = postgres(DATABASE_URL, { prepare: false });
 const WARDS = {
   ziwa: '22222222-0000-4000-8000-000000000005',
   kadzandani: '22222222-0000-4000-8000-000000000001',
+  mkomani: '22222222-0000-4000-8000-000000000003',
 };
 
 // [name, phoneRaw, wardKey, villageName|null, title|null]
@@ -45,6 +46,13 @@ const PEOPLE = [
   ['Juma Rassul Mwadzaya',       '0714592113', 'kadzandani', null, 'Editor'],
   ['Dessy Awour',                '0757845251', 'kadzandani', null, null],
   ['Caroline Ruwa',              '0790481808', 'kadzandani', null, 'Chair Lady'],
+  // ── Mkomani ── (no villages supplied)
+  ['Lucy Agutu',     '0702816974', 'mkomani', null, null],
+  ['Faith Ngel',     '0718456180', 'mkomani', null, null],
+  ['Diana Ogoye',    '0737014485', 'mkomani', null, null],
+  ['Oscar',          '0712863480', 'mkomani', null, null],
+  ['Sammy',          '0703754630', 'mkomani', null, null],
+  ['Mercy',          '0712156983', 'mkomani', null, null],
 ];
 
 function normPhone(raw) {
