@@ -12,6 +12,7 @@ import {
   WARD_PROFILES,
   CYCLE_TRENDS,
   type HistoricalElection,
+  type HistoricalCandidate,
 } from '@/data/elections-history';
 import { CURRENT_POLLS, computePollAverage } from '@/data/current-polls';
 
@@ -71,6 +72,21 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
       })
     : null;
 
+  // Real registered-voter weight per ward — used to project the per-ward split of
+  // a complete cycle's result (the only honest basis we have for a per-ward view).
+  const wardWeights = (['2013', '2017', '2022'].includes(tab))
+    ? await withRlsTx(claims, async (tx) => {
+        const rows = (await tx.execute(sql`
+          SELECT w.name AS name, COUNT(v.*)::int AS registered
+          FROM wards w
+          LEFT JOIN voters v ON v.ward_id = w.id AND v.consent_withdrawn_at IS NULL
+          GROUP BY w.name
+          ORDER BY w.name
+        `)) as any[];
+        return rows.map((r) => ({ name: String(r.name), registered: Number(r.registered) }));
+      })
+    : null;
+
   return (
     <div className="space-y-6 max-w-6xl">
       <header className="space-y-1">
@@ -93,9 +109,9 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
 
       {tab === 'pollings'  && <TabPollings />}
       {tab === 'history'   && <TabHistory />}
-      {tab === '2013'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2013)!} />}
-      {tab === '2017'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2017)!} />}
-      {tab === '2022'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2022)!} />}
+      {tab === '2013'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2013)!} wardWeights={wardWeights} />}
+      {tab === '2017'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2017)!} wardWeights={wardWeights} />}
+      {tab === '2022'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2022)!} wardWeights={wardWeights} />}
       {tab === 'analysis'  && <TabAnalysis demo={ourDemo} />}
     </div>
   );
@@ -221,7 +237,7 @@ function TabHistory() {
 
 // ─── TAB: Per-cycle (2013 / 2017 / 2022) ──────────────────────────────────────
 
-function TabCycle({ election }: { election: HistoricalElection }) {
+function TabCycle({ election, wardWeights }: { election: HistoricalElection; wardWeights: { name: string; registered: number }[] | null }) {
   const trend = CYCLE_TRENDS.find((t) => t.year === election.year);
   const winner = election.candidates.find((c) => c.isWinner)!;
   const runnerUp = election.candidates.find((c) => !c.isWinner);
@@ -298,6 +314,11 @@ function TabCycle({ election }: { election: HistoricalElection }) {
         </Caption>
       </ChartCard>
 
+      {/* Per-ward projection — only for cycles with a complete official slate */}
+      {election.complete && wardWeights && wardWeights.length > 0 && (
+        <PerWardProjection election={election} wardWeights={wardWeights} />
+      )}
+
       {/* Notes */}
       <ChartCard title={`${election.year} notes`} subtitle="verified facts &amp; data caveats">
         <ul className="text-sm text-brand-textBody space-y-1">
@@ -310,6 +331,89 @@ function TabCycle({ election }: { election: HistoricalElection }) {
         </ul>
       </ChartCard>
     </div>
+  );
+}
+
+// Per-ward outlook: distributes the verified constituency top-3 result across
+// wards in proportion to each ward's REAL registered-voter count (uniform model).
+// Honest framing: the ward WEIGHT pie is real data; the per-candidate split is an
+// estimate, because official per-ward MP tallies are not published.
+function PerWardProjection({
+  election, wardWeights,
+}: {
+  election: HistoricalElection;
+  wardWeights: { name: string; registered: number }[];
+}) {
+  const totalReg = wardWeights.reduce((s, w) => s + w.registered, 0) || 1;
+  const top3 = [...election.candidates]
+    .filter((c) => c.votes != null)
+    .sort((a, b) => (b.votes as number) - (a.votes as number))
+    .slice(0, 3) as Array<HistoricalCandidate & { votes: number }>;
+  const palette = [COLORS.teal, COLORS.amber, COLORS.aqua, COLORS.sky, COLORS.emerald];
+
+  // Estimated votes per ward per top-3 candidate (uniform model).
+  const est = (votes: number, reg: number) => Math.round(votes * (reg / totalReg));
+
+  return (
+    <ChartCard
+      title={`${election.year} — per-ward outlook (top 3)`}
+      subtitle="estimated split of the verified result, weighted by each ward's registered voters"
+    >
+      <div className="rounded-lg border border-brand-gold/50 bg-brand-gold/10 px-3 py-2 text-[11px] text-brand-textBody mb-4">
+        ⚠ <strong>Estimate, not official.</strong> Per-ward MP tallies aren&apos;t published. Bars/pies distribute the
+        confirmed constituency result across wards by registered-voter weight (assumes each ward votes like the
+        constituency average). The <strong>ward-weight pie is real data</strong>.
+      </div>
+
+      {/* Real data: ward electoral weight */}
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 items-center mb-6">
+        <div className="flex flex-col items-center">
+          <Pie
+            donut size={180}
+            centerText={totalReg.toLocaleString()}
+            centerSubText="registered"
+            data={wardWeights.map((w, i) => ({ label: w.name, value: w.registered, color: palette[i] ?? COLORS.neutral }))}
+          />
+          <div className="text-[11px] text-brand-textMuted mt-2">Ward electoral weight (real)</div>
+        </div>
+        <BarChart
+          yAxisLabel="Registered voters"
+          bars={wardWeights.map((w, i) => ({ label: w.name, value: w.registered, color: palette[i] ?? COLORS.neutral, hint: `${((w.registered / totalReg) * 100).toFixed(1)}%` }))}
+        />
+      </div>
+
+      {/* Estimated top-3 votes by ward (grouped bar) */}
+      <GroupedBarChart
+        yAxisLabel="Est. votes"
+        className="max-w-5xl"
+        groups={wardWeights.map((w) => w.name)}
+        series={top3.map((c, i) => ({
+          label: `${c.name.split(' ')[0]} (${c.party})`,
+          color: palette[i] ?? COLORS.neutral,
+          values: wardWeights.map((w) => est(c.votes, w.registered)),
+        }))}
+      />
+
+      {/* Per-ward top-3 donuts */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-6">
+        {wardWeights.map((w) => (
+          <div key={w.name} className="flex flex-col items-center">
+            <Pie
+              donut size={120}
+              data={top3.map((c, i) => ({ label: c.name.split(' ')[0], value: est(c.votes, w.registered), color: palette[i] ?? COLORS.neutral }))}
+            />
+            <div className="text-[11px] font-semibold text-brand-textActive mt-1">{w.name}</div>
+            <div className="text-[10px] text-brand-textMuted">~{w.registered.toLocaleString()} voters</div>
+          </div>
+        ))}
+      </div>
+
+      <Caption>
+        Top 3 ({election.year}): {top3.map((c) => `${c.name.split(' ')[0]} ${c.votes.toLocaleString()}`).join(' · ')}.
+        Kongowea and the larger wards carry the most weight, so they dominate the projected counts — which is why
+        turnout there decides the seat.
+      </Caption>
+    </ChartCard>
   );
 }
 
