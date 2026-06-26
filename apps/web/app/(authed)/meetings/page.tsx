@@ -121,6 +121,7 @@ interface PageProps {
     ward?: string;
     contactQ?: string;
     siteQ?: string;
+    site?: string;        // site id to prefill the meeting form from (from unvisited cards)
     created?: string;
     activityCreated?: string;
     meetingError?: string;
@@ -290,6 +291,24 @@ export default async function MeetingsPage({ searchParams }: PageProps) {
       unvisitedTotal = Number(value);
     }
 
+    // Prefill the meeting form from a clicked unvisited site (action=new&site=…).
+    let prefillSite: { id: string; name: string; type: string; areaName: string | null; wardName: string | null } | null = null;
+    if (action === 'new' && searchParams.site) {
+      const rows = await tx
+        .select({
+          id: communitySites.id,
+          name: communitySites.name,
+          type: communitySites.type,
+          areaName: communitySites.areaName,
+          wardName: wards.name,
+        })
+        .from(communitySites)
+        .leftJoin(wards, eq(wards.id, communitySites.wardId))
+        .where(eq(communitySites.id, searchParams.site))
+        .limit(1);
+      prefillSite = rows[0] ?? null;
+    }
+
     // ── Plan-my-month itinerary builder (action=plan) ──────────────────────
     // Greeting name + every unvisited site (clustered by ward → area on the
     // client) + everything already planned (the itinerary board).
@@ -337,7 +356,7 @@ export default async function MeetingsPage({ searchParams }: PageProps) {
       planItinerary = planned.filter((p): p is typeof p & { plannedVisitAt: Date } => p.plannedVisitAt != null);
     }
 
-    return { wardRows, meetingRows, activityRows, peopleMap, contactRows, unvisitedSites, unvisitedTotal, firstName, planUnvisited, planItinerary };
+    return { wardRows, meetingRows, activityRows, peopleMap, contactRows, unvisitedSites, unvisitedTotal, firstName, planUnvisited, planItinerary, prefillSite };
   });
 
   // Compose entries (meetings + activities merged into one sorted feed)
@@ -408,7 +427,7 @@ export default async function MeetingsPage({ searchParams }: PageProps) {
 
       {/* ── Schedule meeting form ───────────────────────────────────── */}
       {action === 'new' && (
-        <ScheduleMeetingForm contacts={data.contactRows} contactQ={contactQ} />
+        <ScheduleMeetingForm contacts={data.contactRows} contactQ={contactQ} prefillSite={data.prefillSite} />
       )}
 
       {/* ── Activity at site form ───────────────────────────────────── */}
@@ -612,21 +631,41 @@ function ActivityCard({ activity: a }: { activity: any }) {
 // ── Schedule meeting form ───────────────────────────────────────────────────
 
 function ScheduleMeetingForm({
-  contacts, contactQ,
+  contacts, contactQ, prefillSite,
 }: {
   contacts: { id: string; fullName: string; phone: string; role: string; wardId: string | null }[];
   contactQ: string;
+  prefillSite?: { id: string; name: string; type: string; areaName: string | null; wardName: string | null } | null;
 }) {
+  // When launched from an unvisited site card, prefill the meeting around that visit.
+  const pm = prefillSite ? typeMeta(prefillSite.type) : null;
+  const prefillTitle = prefillSite ? `Visit: ${prefillSite.name}` : '';
+  const prefillLocation = prefillSite
+    ? [prefillSite.name, prefillSite.areaName, prefillSite.wardName].filter(Boolean).join(', ')
+    : '';
+  const prefillType = prefillSite ? 'courtesy_call' : 'internal_strategy';
+
   return (
+    <div className="space-y-4">
+      {prefillSite && (
+        <div className="rounded-xl border border-brand-orangePrimary/40 bg-brand-orangePrimary/10 px-4 py-3 flex items-center justify-between gap-3">
+          <div className="text-sm text-brand-textActive">
+            {pm?.icon} Scheduling a visit to <strong>{prefillSite.name}</strong>
+            <span className="text-brand-textMuted"> · {pm?.label}{prefillSite.wardName ? ` · ${prefillSite.wardName}` : ''}</span>
+          </div>
+          <Link href="/meetings?view=unvisited" className="text-xs font-semibold text-brand-orangeBright hover:text-brand-orangePrimary shrink-0">change site</Link>
+        </div>
+      )}
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       {/* Contact picker */}
       <div className="lg:col-span-1 rounded-xl border border-brand-border bg-brand-cardBg p-4 space-y-3">
         <div>
-          <div className="text-sm font-bold text-brand-textActive">1. Pick contacts</div>
-          <p className="text-[11px] text-brand-textMuted">Tick everyone to invite. The form on the right sends one invite per ticked person.</p>
+          <div className="text-sm font-bold text-brand-textActive">1. Pick who to invite</div>
+          <p className="text-[11px] text-brand-textMuted">Tick everyone to invite. After scheduling you can send each a WhatsApp/SMS reminder.</p>
         </div>
         <form method="get" className="flex items-center gap-2">
           <input type="hidden" name="action" value="new" />
+          {prefillSite && <input type="hidden" name="site" value={prefillSite.id} />}
           <input
             type="search"
             name="contactQ"
@@ -654,11 +693,12 @@ function ScheduleMeetingForm({
         <FieldRow>
           <Field label="Title *" htmlFor="m-title">
             <input id="m-title" name="title" type="text" required maxLength={200}
+              defaultValue={prefillTitle}
               placeholder="e.g. Mosque elders courtesy call"
               className="w-full bg-brand-cardBgHeavy border border-brand-border rounded-md px-3 py-2 text-sm text-brand-textActive focus:outline-none focus:border-brand-skyBlue" />
           </Field>
           <Field label="Type *" htmlFor="m-type">
-            <select id="m-type" name="type" required
+            <select id="m-type" name="type" required defaultValue={prefillType}
               className="w-full bg-brand-cardBgHeavy border border-brand-border rounded-md px-3 py-2 text-sm text-brand-textActive focus:outline-none focus:border-brand-skyBlue">
               {MEETING_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -674,6 +714,7 @@ function ScheduleMeetingForm({
           </Field>
           <Field label="Location" htmlFor="m-location">
             <input id="m-location" name="location" type="text" maxLength={200}
+              defaultValue={prefillLocation}
               placeholder="Venue, hall, or address"
               className="w-full bg-brand-cardBgHeavy border border-brand-border rounded-md px-3 py-2 text-sm text-brand-textActive focus:outline-none focus:border-brand-skyBlue" />
           </Field>
@@ -717,6 +758,7 @@ function ScheduleMeetingForm({
           <Link href="/meetings" className="text-xs text-brand-textMuted hover:text-brand-textActive">Cancel</Link>
         </div>
       </form>
+    </div>
     </div>
   );
 }
@@ -880,24 +922,34 @@ function UnvisitedSitesFinder({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {sites.map((s) => (
-            <Link
-              key={s.id}
-              href={`/wards/${s.wardId}?tab=sites`}
-              className="group rounded-xl border border-brand-border bg-brand-cardBg p-4 hover:border-brand-tealBlue/70 hover:shadow-brand-teal transition"
-            >
-              <div className="text-xs font-bold text-brand-orangeBright uppercase tracking-wider">{s.type.replace(/_/g, ' ')}</div>
-              <div className="text-sm font-bold text-brand-textActive mt-1 group-hover:text-brand-skyBlue transition">{s.name}</div>
-              <div className="text-[11px] text-brand-textMuted mt-1">
-                {s.wardName ?? '—'}
-                {s.areaName && <> · {s.areaName}</>}
+          {sites.map((s) => {
+            const m = typeMeta(s.type);
+            return (
+              <div
+                key={s.id}
+                className="group rounded-xl border border-brand-border bg-brand-cardBg p-4 hover:border-brand-tealBlue/70 hover:shadow-brand-teal transition flex flex-col"
+              >
+                <div className="text-xs font-bold text-brand-orangeBright uppercase tracking-wider">{m.icon} {m.label}</div>
+                <div className="text-sm font-bold text-brand-textActive mt-1">{s.name}</div>
+                <div className="text-[11px] text-brand-textMuted mt-1">
+                  {s.wardName ?? '—'}
+                  {s.areaName && <> · {s.areaName}</>}
+                </div>
+                <div className="mt-3 pt-3 border-t border-brand-border/60 flex items-center justify-between gap-2">
+                  {/* Primary action: schedule a meeting/visit prefilled from this site */}
+                  <Link
+                    href={`/meetings?action=new&site=${s.id}`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-brand-orangePrimary text-white text-[11px] font-bold uppercase tracking-wider shadow-brand-orange hover:bg-brand-orangeBright transition"
+                  >
+                    📅 Schedule meeting
+                  </Link>
+                  <Link href={`/wards/${s.wardId}?tab=sites`} className="text-[10px] text-brand-aqua hover:text-brand-skyBlue shrink-0">
+                    Open ward →
+                  </Link>
+                </div>
               </div>
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-brand-textMuted">UNVISITED</span>
-                <span className="text-[10px] text-brand-aqua group-hover:text-brand-skyBlue">Open ward →</span>
-              </div>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

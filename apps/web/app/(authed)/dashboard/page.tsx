@@ -14,6 +14,7 @@ import { withRlsTx } from '@/lib/api';
 import { ConstituencyMap } from '@/components/map/constituency-map';
 import { KpiTile, KpiIcons } from '@/components/kpi-tile';
 import { CoverageDonut } from '@/components/coverage-donut';
+import { PhoneActions } from '@/components/phone-actions';
 
 // Home — the single-pane summary. Pulls live data from every other page so
 // nobody needs to leave home for the day-to-day numbers:
@@ -166,6 +167,7 @@ export default async function DashboardPage() {
         scheduledAt: meetings.scheduledAt,
         location: meetings.location,
         status: meetings.status,
+        inviteePersonIds: meetings.inviteePersonIds,
       })
       .from(meetings)
       .where(and(
@@ -175,6 +177,24 @@ export default async function DashboardPage() {
       ))
       .orderBy(meetings.scheduledAt)
       .limit(5);
+
+    // Resolve invitees (phone + name) so Home can fire WhatsApp/SMS reminders.
+    const inviteeIds = new Set<string>();
+    upcomingMeetings.forEach((m) => (m.inviteePersonIds ?? []).forEach((id) => inviteeIds.add(id)));
+    let inviteeMap = new Map<string, { id: string; fullName: string; phone: string }>();
+    if (inviteeIds.size > 0) {
+      const rows = await tx
+        .select({ id: people.id, fullName: people.fullName, phone: people.phone })
+        .from(people)
+        .where(inArray(people.id, Array.from(inviteeIds)));
+      inviteeMap = new Map(rows.map((r) => [r.id, r]));
+    }
+    const inviteesByMeeting: Record<string, { id: string; fullName: string; phone: string }[]> = {};
+    upcomingMeetings.forEach((m) => {
+      inviteesByMeeting[m.id] = (m.inviteePersonIds ?? [])
+        .map((id) => inviteeMap.get(id))
+        .filter((p): p is { id: string; fullName: string; phone: string } => !!p);
+    });
 
     // ── Upcoming site activities (overlap with Itinerary) ─────────────
     const upcomingActivities = await tx
@@ -239,6 +259,7 @@ export default async function DashboardPage() {
         visited: Number(r.visited),
       })),
       upcomingMeetings,
+      inviteesByMeeting,
       upcomingActivities,
       topUnvisited,
     };
@@ -416,23 +437,43 @@ export default async function DashboardPage() {
             />
           ) : (
             <ul className="space-y-2">
-              {summary.upcomingMeetings.map((m) => (
-                <li key={m.id}>
-                  <Link
-                    href={`/meetings#${m.id}`}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-brand-border bg-brand-cardBgHeavy px-3 py-2 hover:border-brand-orangeBright/60 transition group"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-brand-textActive truncate">{m.title}</div>
-                      <div className="text-[11px] text-brand-textMuted">
-                        {new Date(m.scheduledAt).toLocaleString('en-KE', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        {m.location && <> · {m.location}</>}
+              {summary.upcomingMeetings.map((m) => {
+                const invitees = summary.inviteesByMeeting[m.id] ?? [];
+                const whenStr = new Date(m.scheduledAt).toLocaleString('en-KE', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                return (
+                  <li key={m.id} className="rounded-lg border border-brand-border bg-brand-cardBgHeavy px-3 py-2">
+                    <Link href={`/meetings#${m.id}`} className="flex items-center justify-between gap-3 group">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-brand-textActive truncate group-hover:text-brand-orangeBright transition">{m.title}</div>
+                        <div className="text-[11px] text-brand-textMuted">
+                          {whenStr}
+                          {m.location && <> · {m.location}</>}
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-brand-orangeBright shrink-0">{m.status}</span>
-                  </Link>
-                </li>
-              ))}
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-brand-orangeBright shrink-0">{m.status}</span>
+                    </Link>
+                    {invitees.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-brand-border/50">
+                        <div className="text-[10px] uppercase tracking-wider text-brand-textMuted font-bold mb-1.5">
+                          Remind {invitees.length} invitee{invitees.length === 1 ? '' : 's'}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {invitees.map((p) => (
+                            <div key={p.id} className="flex items-center gap-1.5 bg-brand-cardBg rounded-md px-2 py-1">
+                              <span className="text-[11px] font-semibold text-brand-textActive">{p.fullName.split(' ')[0]}</span>
+                              <PhoneActions
+                                phone={p.phone}
+                                size="sm"
+                                defaultMessage={`Hi ${p.fullName.split(' ')[0]}, reminder for "${m.title}" on ${whenStr}${m.location ? ` at ${m.location}` : ''}. Asante!`}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Panel>
