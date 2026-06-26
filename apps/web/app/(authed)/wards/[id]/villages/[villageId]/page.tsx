@@ -85,7 +85,7 @@ export default async function VillagePage({ params }: { params: { id: string; vi
       .from(villageIssues).where(eq(villageIssues.villageId, villageId)).orderBy(desc(villageIssues.createdAt));
 
     const sites = await tx
-      .select({ id: communitySites.id, name: communitySites.name, type: communitySites.type, visited: communitySites.visited })
+      .select({ id: communitySites.id, name: communitySites.name, type: communitySites.type, visited: communitySites.visited, estimatedSize: communitySites.estimatedSize })
       .from(communitySites)
       .where(and(eq(communitySites.villageId, villageId), isNull(communitySites.deletedAt)))
       .orderBy(asc(communitySites.type), asc(communitySites.name));
@@ -159,7 +159,9 @@ export default async function VillagePage({ params }: { params: { id: string; vi
                         <span className="text-base shrink-0">{m.icon}</span>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold text-brand-textActive truncate">{s.name}</div>
-                          <div className="text-[10px] uppercase tracking-wider text-brand-textMuted">{m.label}</div>
+                          <div className="text-[10px] uppercase tracking-wider text-brand-textMuted">
+                            {m.label}{s.type === 'boda_stage' && s.estimatedSize ? ` · ${s.estimatedSize} riders` : ''}
+                          </div>
                         </div>
                         <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${s.visited ? 'bg-brand-success/15 text-brand-success' : 'bg-brand-textMuted/10 text-brand-textMuted'}`}>
                           {s.visited ? 'visited' : 'to visit'}

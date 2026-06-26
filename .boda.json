@@ -1,0 +1,1108 @@
+[
+{
+"no": 1,
+"name": "Kingstone Baobab Stage",
+"members": 25,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 43,
+"name": "Simba Road Bodaboda Stage",
+"members": 28,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 2,
+"name": "APA Bodaboda Stage",
+"members": 20,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 44,
+"name": "Kenyatta road Stage",
+"members": 32,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 3,
+"name": "Bliss Sunrise-ocean View Stage",
+"members": 27,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 45,
+"name": "Nyali Primary Stage",
+"members": 25,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 4,
+"name": "Citymall-Nyali Centre Stage",
+"members": 45,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 46,
+"name": "Bp Bodaboda Stage",
+"members": 40,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 5,
+"name": "Reef-Voyger Stage",
+"members": 35,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 47,
+"name": "English point Stage",
+"members": 35,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 6,
+"name": "Links Planza-Zamzam Stage",
+"members": 40,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 48,
+"name": "Tamarind Bodaboda Stage",
+"members": 27,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 7,
+"name": "Customs Bodaboda Stage",
+"members": 29,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 49,
+"name": "Mkomani Bodaboda Stage",
+"members": 46,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 8,
+"name": "Pavilion Customs Bodaboda",
+"members": 25,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 50,
+"name": "Minalove Bodaboda Stage",
+"members": 30,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 9,
+"name": "Bombolulu Sports Stage",
+"members": 46,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 51,
+"name": "Cinemax Bodaboda Stage",
+"members": 35,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 10,
+"name": "COS Bodaboda Stage",
+"members": 25,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 52,
+"name": "Blue Wave Bodaboda Stage",
+"members": 25,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 11,
+"name": "Bombolulu Workshop Stage",
+"members": 50,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 53,
+"name": "Khadija Bodaboda Stage",
+"members": 18,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 12,
+"name": "Stage ya Basi Stage",
+"members": 28,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 54,
+"name": "Villago Bodaboda Stage",
+"members": 43,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 13,
+"name": "Bombolulu Mainland Stage",
+"members": 15,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 55,
+"name": "Banashungusia Stage",
+"members": 20,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 14,
+"name": "Bombolulu Estate Stage",
+"members": 45,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 56,
+"name": "St. Paul 1 Bodaboda Stage",
+"members": 22,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 15,
+"name": "Raha Leo Stage",
+"members": 15,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 57,
+"name": "Mwamko Mpya Stage",
+"members": 35,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 16,
+"name": "Bombolulu Mtamboni Stage",
+"members": 25,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 58,
+"name": "Sineno Bar Bodaboda Stage",
+"members": 26,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 17,
+"name": "Bombolulu Mskitini Stage",
+"members": 30,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 59,
+"name": "Bata Bodaboda Stage",
+"members": 35,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 18,
+"name": "Gichanga Mwembeni",
+"members": 45,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 60,
+"name": "Sauri yako Bodaboda Stage",
+"members": 48,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 19,
+"name": "Viena Bodaboda Stage",
+"members": 40,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 61,
+"name": "Sanana Bodaboda Stage",
+"members": 26,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 20,
+"name": "Mkunguni Gichanga",
+"members": 15,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 62,
+"name": "Mnazi Mmoja Beach road",
+"members": 32,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 21,
+"name": "Jumuirah Baracks Stage",
+"members": 27,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 63,
+"name": "Jobless Kona Bodaboda",
+"members": 25,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 22,
+"name": "Dhow House Baracks Stage",
+"members": 23,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 64,
+"name": "Mnazi Mmoja Junction Stage",
+"members": 36,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 23,
+"name": "Kona Baracks Stage",
+"members": 31,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 65,
+"name": "Petrocity Bodaboda Stage",
+"members": 28,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 24,
+"name": "Dankar Bodaboda Stage",
+"members": 32,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 66,
+"name": "Kona Mwingi Bodaboda Stage",
+"members": 30,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 25,
+"name": "Carrefour Bodaboda Stage",
+"members": 30,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 67,
+"name": "Solomon’s Gate Bodaboda",
+"members": 36,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 26,
+"name": "Nyali Golf Bodaboda stage",
+"members": 32,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 68,
+"name": "Maweni Bustani Stage",
+"members": 42,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 27,
+"name": "Mamba Bodaboda Stage",
+"members": 43,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 69,
+"name": "New Mskitinini Stage",
+"members": 25,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 28,
+"name": "Mkilifi Mamba Bodaboda",
+"members": 26,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 70,
+"name": "Mwembe Wa Siasa Stage",
+"members": 30,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 30,
+"name": "Beachroad Bodaboda Stage",
+"members": 32,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 71,
+"name": "Maweni Mbuyuni Stage",
+"members": 30,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 31,
+"name": "Nyali West Bodaboda Stage",
+"members": 30,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 72,
+"name": "Kangi Bodaboda Stage",
+"members": 36,
+"ward": "kongowea",
+"page": 1
+},
+{
+"no": 32,
+"name": "Gichanga Bodaboda Stage",
+"members": 45,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 73,
+"name": "Leisure Bodaboda Stage",
+"members": 40,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 33,
+"name": "St. Paul Bodaboda Stage",
+"members": 27,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 74,
+"name": "Leisure Superloufe Stage",
+"members": 35,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 34,
+"name": "KBC VOK Bodaboda Stage",
+"members": 35,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 75,
+"name": "Leisure B Bodaboda Stage",
+"members": 24,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 35,
+"name": "VOK Bodaboda Stage",
+"members": 49,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 76,
+"name": "Makutini Highway Stage",
+"members": 48,
+"ward": "kongowea",
+"page": 1
+},
+{
+"no": 36,
+"name": "Bombolulu Mainland",
+"members": 15,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 77,
+"name": "Rocksun Bodaboda Stage",
+"members": 34,
+"ward": "kongowea",
+"page": 1
+},
+{
+"no": 37,
+"name": "Kisimani B Bodaboda Stage",
+"members": 28,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 78,
+"name": "Kwa Chief Bodaboda Stage",
+"members": 26,
+"ward": "kongowea",
+"page": 1
+},
+{
+"no": 38,
+"name": "Mskiti Takwa Stage",
+"members": 20,
+"ward": "ziwa",
+"page": 1
+},
+{
+"no": 79,
+"name": "Karama Bodaboda Stage",
+"members": 50,
+"ward": "kongowea",
+"page": 1
+},
+{
+"no": 39,
+"name": "Nyali beach Bodaboda stage",
+"members": 31,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 80,
+"name": "Karama Mskitini Stage",
+"members": 30,
+"ward": "kongowea",
+"page": 1
+},
+{
+"no": 40,
+"name": "Olienda Bodaboda stage",
+"members": 32,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 81,
+"name": "African bar Bodaboda Stage",
+"members": 27,
+"ward": "kongowea",
+"page": 1
+},
+{
+"no": 41,
+"name": "Koroga Bodaboda stage",
+"members": 18,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 82,
+"name": "Ratna Bodaboda Stage",
+"members": 32,
+"ward": "kongowea",
+"page": 1
+},
+{
+"no": 42,
+"name": "St. Kevin Bodaboda Stage",
+"members": 16,
+"ward": "mkomani",
+"page": 1
+},
+{
+"no": 83,
+"name": "Masandukuni Bodaboda Stage",
+"members": 28,
+"ward": "kongowea",
+"page": 1
+},
+{
+"no": 84,
+"name": "Mlango Wa Soko Stage",
+"members": 48,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 132,
+"name": "Malindi Store Stage",
+"members": 26,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 85,
+"name": "Senator Bodaboda stage",
+"members": 15,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 133,
+"name": "Kadzandani Primary",
+"members": 27,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 86,
+"name": "Kongowea Clinic Stage",
+"members": 30,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 134,
+"name": "Royal Bodaboda Stage",
+"members": 15,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 87,
+"name": "Kona Bahari Stage",
+"members": 47,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 135,
+"name": "Gasfied Bodaboda Stage",
+"members": 27,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 89,
+"name": "Kongowea Lights Stage",
+"members": 98,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 136,
+"name": "Bandari Villas Stage",
+"members": 18,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 90,
+"name": "Kongowea H.T Stage",
+"members": 30,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 137,
+"name": "M?watamba 1 Stage",
+"members": 17,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 91,
+"name": "Mlika Mwizi Bodaboda",
+"members": 24,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 138,
+"name": "Pandya Corner Stage",
+"members": 30,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 92,
+"name": "Sisi kwa sisi Stage",
+"members": 23,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 139,
+"name": "Uchumi Bullo Stage",
+"members": 18,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 93,
+"name": "Mkunguni bodaboda Stage",
+"members": 20,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 140,
+"name": "Gorofa Green Stage",
+"members": 40,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 94,
+"name": "Mt. Zion Bodaboda Stage",
+"members": 10,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 141,
+"name": "Lake View Phase 3 Stage",
+"members": 38,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 95,
+"name": "Makumi Café Bodaboda",
+"members": 24,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 142,
+"name": "Transnick Bodaboda Stage",
+"members": 20,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 96,
+"name": "Buhurani Fayaz Bodaboda",
+"members": 27,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 143,
+"name": "T.N.L Kwa Ruto stage",
+"members": 30,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 97,
+"name": "Kongowea matopeni Stage",
+"members": 25,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 144,
+"name": "Bungoni Police Stage",
+"members": 30,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 98,
+"name": "Club Duos Bodaboda Stage",
+"members": 22,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 145,
+"name": "Green House Bungoni Stage",
+"members": 20,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 99,
+"name": "KPA Bodaboda Stage",
+"members": 46,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 146,
+"name": "Silent Bodaboda Stage",
+"members": 16,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 100,
+"name": "Mwangaza Bodaboda Stage",
+"members": 48,
+"ward": "kongowea",
+"page": 2
+},
+{
+"no": 147,
+"name": "Mkwajuni Bodaboda Stage",
+"members": 26,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 101,
+"name": "Makoma Road Stage",
+"members": 16,
+"ward": "mkomani",
+"page": 2
+},
+{
+"no": 148,
+"name": "Hakika Bodaboda Stage",
+"members": 30,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 102,
+"name": "Ziwani Bodaboda Stage",
+"members": 20,
+"ward": "ziwa",
+"page": 2
+},
+{
+"no": 149,
+"name": "Kisimani A Bodaboda Stage",
+"members": 40,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 103,
+"name": "Cocacola Bodaboda Stage",
+"members": 18,
+"ward": "ziwa",
+"page": 2
+},
+{
+"no": 150,
+"name": "Frere Town Uwanjani Stage",
+"members": 26,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 104,
+"name": "Naivas Bodaboda Stage",
+"members": 30,
+"ward": "ziwa",
+"page": 2
+},
+{
+"no": 151,
+"name": "Frere Town School Stage",
+"members": 30,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 105,
+"name": "Kwa Ndanda Stage",
+"members": 17,
+"ward": "ziwa",
+"page": 2
+},
+{
+"no": 152,
+"name": "Katisha Mkahawani Stage",
+"members": 20,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 106,
+"name": "KayDee 2 Bodaboda Stage",
+"members": 19,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 153,
+"name": "Mkahawani Gorofani Stage",
+"members": 22,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 107,
+"name": "Posta Bodaboda Stage",
+"members": 24,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 154,
+"name": "Mary Joy Bodaboda Stage",
+"members": 16,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 108,
+"name": "Blue Pacific Bodaboda Stage",
+"members": 22,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 155,
+"name": "Bbrookside Bodaboda Stage",
+"members": 30,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 109,
+"name": "Premier Bodaboda Stage",
+"members": 25,
+"ward": "ziwa",
+"page": 2
+},
+{
+"no": 156,
+"name": "Kisauni Polytechnic Stage",
+"members": 16,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 110,
+"name": "Trasnicky Mskitini Stage",
+"members": 12,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 157,
+"name": "Phase 5 Bodaboda Stage",
+"members": 30,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 111,
+"name": "Rayan Bodaboda Stage",
+"members": 15,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 158,
+"name": "Beyond Scope Stage",
+"members": 28,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 112,
+"name": "Kwa Rasta Bodaboda Stage",
+"members": 20,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 159,
+"name": "Leisure Community Stage",
+"members": 17,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 113,
+"name": "KayDee 1 Bodaboda Stage",
+"members": 18,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 160,
+"name": "Sunlight opposite Stage",
+"members": 24,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 114,
+"name": "Migombani Bodaboda Stage",
+"members": 18,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 161,
+"name": "Freretown Bite bite Stage",
+"members": 23,
+"ward": "freretown",
+"page": 2
+},
+{
+"no": 115,
+"name": "Victory Bodaboda Stage",
+"members": 20,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 116,
+"name": "Amazon Bodaboda Stage",
+"members": 30,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 117,
+"name": "Baraka Estate Stage",
+"members": 15,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 118,
+"name": "Baraka High Stage",
+"members": 21,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 119,
+"name": "Gidions Tyre Stage",
+"members": 16,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 120,
+"name": "Bombolulu Estate Stage",
+"members": 26,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 121,
+"name": "Kona Bullo Stage",
+"members": 22,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 122,
+"name": "Godwon Bodaboda Stage",
+"members": 23,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 123,
+"name": "Masters Bodaboda Stage",
+"members": 18,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 124,
+"name": "Mwembeni Stage",
+"members": 45,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 125,
+"name": "Rubis Bodaboda Stage",
+"members": 13,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 126,
+"name": "Amani Bodaboda Stage",
+"members": 14,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 127,
+"name": "Kwa Mkali Stage",
+"members": 30,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 128,
+"name": "Bulo Junction",
+"members": 20,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 130,
+"name": "Kwa Chai Bodaboda Stage",
+"members": 15,
+"ward": "kadzandani",
+"page": 2
+},
+{
+"no": 131,
+"name": "001 Kadzandani Pri. Stage",
+"members": 15,
+"ward": "kadzandani",
+"page": 2
+}
+]

@@ -1251,6 +1251,9 @@ function SiteCard({ site }: { site: any }) {
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-brand-textActive truncate">{site.name}</div>
+          {site.type === 'boda_stage' && site.estimatedSize ? (
+            <div className="text-xs font-semibold text-brand-orangeBright">🏍️ {site.estimatedSize} riders</div>
+          ) : null}
           {site.contactPersonName && (
             <div className="text-xs text-brand-textMuted truncate">
               {site.contactRole ? `${site.contactRole} · ` : ''}{site.contactPersonName}
