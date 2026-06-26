@@ -242,7 +242,9 @@ function TabCycle({ election, wardWeights }: { election: HistoricalElection; war
   const winner = election.candidates.find((c) => c.isWinner)!;
   const runnerUp = election.candidates.find((c) => !c.isWinner);
   const hasVotes = election.candidates.every((c) => c.votes != null);
-  const maxVotes = Math.max(...election.candidates.map((c) => c.votes ?? 0), 1);
+  const totalValid = election.complete ? election.candidates.reduce((s, c) => s + (c.votes ?? 0), 0) : null;
+  const pctOf = (v: number) => (totalValid ? (v / totalValid) * 100 : 0);
+  const marginVotes = winner.votes != null && runnerUp?.votes != null ? winner.votes - runnerUp.votes : null;
 
   return (
     <div className="space-y-5">
@@ -263,30 +265,53 @@ function TabCycle({ election, wardWeights }: { election: HistoricalElection; war
       </div>
 
       {/* Headline strip */}
-      <div className="rounded-xl border border-brand-border bg-brand-cardBg p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="rounded-xl border border-brand-border bg-brand-cardBg p-4 grid grid-cols-2 md:grid-cols-5 gap-3">
         <Mini label={`${election.year} winner`} value={winner.name} />
         <Mini label="Party" value={winner.party} />
         <Mini label="Votes" value={winner.votes != null ? winner.votes.toLocaleString() : 'Not loaded'} />
         <Mini label="Share" value={trend ? `${trend.winnerShare.toFixed(1)}%` : '—'} />
+        <Mini label="Margin" value={
+          marginVotes != null
+            ? `${marginVotes.toLocaleString()}${totalValid ? ` · ${pctOf(marginVotes).toFixed(1)} pts` : ''}`
+            : '—'
+        } />
       </div>
 
       {/* Candidates */}
       <ChartCard
         title={`${election.year} candidates`}
-        subtitle={hasVotes ? 'official votes (bar length = votes)' : 'confirmed candidates — official tallies not yet loaded'}
+        subtitle={election.complete ? 'vote share of total valid votes' : hasVotes ? 'official votes (full slate not loaded — share not computed)' : 'confirmed candidates — official tallies not yet loaded'}
       >
-        {hasVotes ? (
+        {election.complete && totalValid ? (
           <div className="max-w-5xl">
             <HorizontalBarChart
-              max={Math.ceil(maxVotes / 5000) * 5000}
+              max={Math.max(10, Math.ceil(pctOf(winner.votes as number) / 10) * 10)}
               bars={election.candidates.map((c, i) => ({
                 label: c.name,
-                value: c.votes as number,
+                value: pctOf(c.votes as number),
                 color: c.isWinner ? COLORS.teal : i === 1 ? COLORS.amber : i === 2 ? COLORS.aqua : COLORS.neutral,
                 highlight: c.isWinner,
                 sublabel: `${c.party} · ${(c.votes as number).toLocaleString()} votes`,
               }))}
             />
+          </div>
+        ) : hasVotes ? (
+          <div className="space-y-2 max-w-2xl">
+            {election.candidates.map((c, i) => (
+              <div key={c.name} className="flex items-center justify-between gap-3 rounded-lg border border-brand-border bg-brand-cardBgHeavy/40 px-3 py-2">
+                <div>
+                  <span className="text-sm font-semibold text-brand-textActive">{c.name}</span>
+                  <span className="text-xs text-brand-textMuted"> · {c.party}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-bold tabular-nums text-brand-textActive">{(c.votes as number).toLocaleString()}</span>
+                  <span className={`ml-2 text-[10px] uppercase font-bold tracking-wider ${c.isWinner ? 'text-brand-success' : 'text-brand-textMuted'}`}>{c.isWinner ? 'Winner' : i === 1 ? 'Runner-up' : ''}</span>
+                </div>
+              </div>
+            ))}
+            {marginVotes != null && (
+              <div className="text-xs text-brand-textBody pt-1">Winning margin: <strong>{marginVotes.toLocaleString()}</strong> votes (head-to-head {((winner.votes as number) / ((winner.votes as number) + (runnerUp!.votes as number)) * 100).toFixed(1)}% vs {((runnerUp!.votes as number) / ((winner.votes as number) + (runnerUp!.votes as number)) * 100).toFixed(1)}%).</div>
+            )}
           </div>
         ) : (
           <ul className="space-y-2 max-w-2xl">
@@ -305,9 +330,9 @@ function TabCycle({ election, wardWeights }: { election: HistoricalElection; war
         )}
         <Caption>
           {trend ? (
-            <><strong>{winner.name}</strong> ({winner.party}) won with {trend.winnerShare.toFixed(1)}%; runner-up <strong>{runnerUp?.name}</strong> ({runnerUp?.party}) on {trend.runnerUpShare.toFixed(1)}%. Margin: <strong>{trend.winningMargin.toLocaleString()}</strong> votes.</>
-          ) : winner.votes != null && runnerUp?.votes != null ? (
-            <><strong>{winner.name}</strong> ({winner.party}) beat <strong>{runnerUp.name}</strong> ({runnerUp.party}) by <strong>{(winner.votes - runnerUp.votes).toLocaleString()}</strong> votes. Constituency-wide share isn&apos;t shown because the full slate isn&apos;t loaded.</>
+            <><strong>{winner.name}</strong> ({winner.party}) won with <strong>{trend.winnerShare.toFixed(1)}%</strong>; runner-up <strong>{runnerUp?.name}</strong> ({runnerUp?.party}) on <strong>{trend.runnerUpShare.toFixed(1)}%</strong>. Margin: <strong>{trend.winningMargin.toLocaleString()}</strong> votes (<strong>{pctOf(trend.winningMargin).toFixed(1)} points</strong>).</>
+          ) : marginVotes != null ? (
+            <><strong>{winner.name}</strong> ({winner.party}) beat <strong>{runnerUp?.name}</strong> ({runnerUp?.party}) by <strong>{marginVotes.toLocaleString()}</strong> votes. Constituency-wide percentage isn&apos;t shown because the full slate isn&apos;t loaded.</>
           ) : (
             <><strong>{winner.name}</strong> ({winner.party}) won; runner-up <strong>{runnerUp?.name}</strong> ({runnerUp?.party}). Official vote tallies for this cycle are not yet loaded.</>
           )}
@@ -351,6 +376,12 @@ function PerWardProjection({
     .slice(0, 3) as Array<HistoricalCandidate & { votes: number }>;
   const palette = [COLORS.teal, COLORS.amber, COLORS.aqua, COLORS.sky, COLORS.emerald];
 
+  // Real constituency shares (percentages) of the top-3.
+  const totalAll = election.candidates.reduce((s, c) => s + (c.votes ?? 0), 0) || 1;
+  const winnerC = top3[0];
+  const runnerC = top3[1];
+  const sharePct = (v: number) => (v / totalAll) * 100;
+
   // Estimated votes per ward per top-3 candidate (uniform model).
   const est = (votes: number, reg: number) => Math.round(votes * (reg / totalReg));
 
@@ -382,24 +413,76 @@ function PerWardProjection({
         />
       </div>
 
+      {/* Constituency top-3 — real percentages + margin */}
+      <div className="rounded-lg border border-brand-border bg-brand-cardBgHeavy/40 p-3 mb-4">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-brand-textMuted mb-2">Constituency result (real %)</div>
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+          {top3.map((c, i) => (
+            <span key={c.name} className="text-brand-textBody">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style={{ background: palette[i] }} />
+              <strong className="text-brand-textActive">{c.name.split(' ')[0]}</strong> {c.votes.toLocaleString()} · <strong>{sharePct(c.votes).toFixed(1)}%</strong>
+            </span>
+          ))}
+          {winnerC && runnerC && (
+            <span className="text-brand-textBody">Margin: <strong className="text-brand-orangeBright">{(winnerC.votes - runnerC.votes).toLocaleString()}</strong> ({(sharePct(winnerC.votes) - sharePct(runnerC.votes)).toFixed(1)} pts)</span>
+          )}
+        </div>
+      </div>
+
       {/* Estimated top-3 votes by ward (grouped bar) */}
       <GroupedBarChart
         yAxisLabel="Est. votes"
         className="max-w-5xl"
         groups={wardWeights.map((w) => w.name)}
         series={top3.map((c, i) => ({
-          label: `${c.name.split(' ')[0]} (${c.party})`,
+          label: `${c.name.split(' ')[0]} (${sharePct(c.votes).toFixed(0)}%)`,
           color: palette[i] ?? COLORS.neutral,
           values: wardWeights.map((w) => est(c.votes, w.registered)),
         }))}
       />
 
-      {/* Per-ward top-3 donuts */}
+      {/* Per-ward summary — estimated votes, margin, share of winner's total */}
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wider text-brand-textMuted text-left">
+              <th className="py-1.5 pr-3 font-bold">Ward</th>
+              <th className="py-1.5 px-3 font-bold text-right">Reg. voters</th>
+              {winnerC && <th className="py-1.5 px-3 font-bold text-right">Est. {winnerC.name.split(' ')[0]}</th>}
+              {runnerC && <th className="py-1.5 px-3 font-bold text-right">Est. {runnerC.name.split(' ')[0]}</th>}
+              <th className="py-1.5 px-3 font-bold text-right">Est. margin</th>
+              <th className="py-1.5 pl-3 font-bold text-right">% of winner&apos;s votes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {wardWeights.map((w) => {
+              const ew = winnerC ? est(winnerC.votes, w.registered) : 0;
+              const er = runnerC ? est(runnerC.votes, w.registered) : 0;
+              const shareOfWinner = winnerC ? (ew / winnerC.votes) * 100 : 0;
+              return (
+                <tr key={w.name} className="border-t border-brand-border/40">
+                  <td className="py-1.5 pr-3 font-semibold text-brand-textActive">{w.name}</td>
+                  <td className="py-1.5 px-3 text-right tabular-nums text-brand-textBody">{w.registered.toLocaleString()}</td>
+                  {winnerC && <td className="py-1.5 px-3 text-right tabular-nums text-brand-teal font-semibold">{ew.toLocaleString()}</td>}
+                  {runnerC && <td className="py-1.5 px-3 text-right tabular-nums text-brand-textBody">{er.toLocaleString()}</td>}
+                  <td className="py-1.5 px-3 text-right tabular-nums text-brand-orangeBright font-semibold">+{(ew - er).toLocaleString()}</td>
+                  <td className="py-1.5 pl-3 text-right tabular-nums text-brand-textBody">{shareOfWinner.toFixed(1)}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Per-ward top-3 donuts — winner share in the centre */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-6">
         {wardWeights.map((w) => (
           <div key={w.name} className="flex flex-col items-center">
             <Pie
               donut size={120}
+              showLegend={false}
+              centerText={winnerC ? `${sharePct(winnerC.votes).toFixed(0)}%` : ''}
+              centerSubText={winnerC ? winnerC.name.split(' ')[0] : ''}
               data={top3.map((c, i) => ({ label: c.name.split(' ')[0], value: est(c.votes, w.registered), color: palette[i] ?? COLORS.neutral }))}
             />
             <div className="text-[11px] font-semibold text-brand-textActive mt-1">{w.name}</div>
