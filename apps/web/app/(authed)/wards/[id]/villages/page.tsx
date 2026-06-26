@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
 import { withRlsTx } from '@/lib/api';
 import { AddVillageForm } from '@/components/add-village-form';
+import { WardVillageMap } from '@/components/map/ward-village-map';
 
 // /wards/[id]/villages — grid of village TILES. Click a tile to open the village
 // and see its people (community leaders / elders) and any reported issues.
@@ -81,6 +82,10 @@ export default async function WardVillagesPage({ params }: { params: { id: strin
           <AddVillageForm wardId={wardId} wardName={data.ward.name} />
         </div>
       </header>
+
+      {data.villageRows.length > 0 && (
+        <WardVillageMap wardId={wardId} />
+      )}
 
       {data.villageRows.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-brand-borderStrong bg-brand-cardBg/40 p-8 text-center">
