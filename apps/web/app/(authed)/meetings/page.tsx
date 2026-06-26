@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { and, asc, eq, gte, isNull, lt, or, sql, inArray, ilike, desc } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, isNotNull, lt, or, sql, inArray, ilike, desc } from 'drizzle-orm';
 import {
   activities,
   communitySites,
@@ -76,6 +76,41 @@ const MEETING_TYPE_LABEL: Record<string, string> = MEETING_TYPES.reduce(
   (acc, t) => ({ ...acc, [t.value]: t.label }), {},
 );
 
+// Short, human labels + an emoji for site types shown in the itinerary builder.
+const SITE_TYPE_META: Record<string, { label: string; icon: string }> = {
+  mosque:           { label: 'Mosque',          icon: '🕌' },
+  madrasa:          { label: 'Madrasa',         icon: '📖' },
+  church:           { label: 'Church',          icon: '⛪' },
+  social_hall:      { label: 'Social hall',     icon: '🏛️' },
+  community_hall:   { label: 'Community hall',  icon: '🏛️' },
+  youth_center:     { label: 'Youth centre',    icon: '🧑‍🤝‍🧑' },
+  sports_club:      { label: 'Sports club',     icon: '⚽' },
+  boda_stage:       { label: 'Boda stage',      icon: '🏍️' },
+  matatu_stage:     { label: 'Matatu stage',    icon: '🚐' },
+  market:           { label: 'Market',          icon: '🛒' },
+  shopping_center:  { label: 'Shopping centre', icon: '🏬' },
+  school_public:    { label: 'Public school',   icon: '🏫' },
+  school_private:   { label: 'Private school',  icon: '🏫' },
+  school_secondary: { label: 'Secondary school',icon: '🏫' },
+  school_primary:   { label: 'Primary school',  icon: '🏫' },
+  school_tertiary:  { label: 'College',         icon: '🎓' },
+  school_other:     { label: 'School',          icon: '🏫' },
+  welfare_group:    { label: 'Welfare group',   icon: '🤝' },
+  chama:            { label: 'Chama',           icon: '💰' },
+  sacco:            { label: 'SACCO',           icon: '💳' },
+  self_help_group:  { label: 'Self-help group', icon: '🤝' },
+  health_facility:  { label: 'Health facility', icon: '🏥' },
+  government_office:{ label: 'Govt office',     icon: '🏢' },
+  other:            { label: 'Other',           icon: '📍' },
+};
+function typeMeta(type: string) {
+  return SITE_TYPE_META[type] ?? { label: type.replace(/_/g, ' '), icon: '📍' };
+}
+// Local YYYY-MM-DD for <input type=date> defaults/min (avoids UTC off-by-one).
+function toDateInput(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 interface PageProps {
   searchParams: {
     action?: string;
@@ -90,6 +125,8 @@ interface PageProps {
     activityCreated?: string;
     meetingError?: string;
     activityError?: string;
+    open?: string;        // ward id to auto-expand in the itinerary builder
+    planError?: string;
   };
 }
 
@@ -253,7 +290,54 @@ export default async function MeetingsPage({ searchParams }: PageProps) {
       unvisitedTotal = Number(value);
     }
 
-    return { wardRows, meetingRows, activityRows, peopleMap, contactRows, unvisitedSites, unvisitedTotal };
+    // ── Plan-my-month itinerary builder (action=plan) ──────────────────────
+    // Greeting name + every unvisited site (clustered by ward → area on the
+    // client) + everything already planned (the itinerary board).
+    let firstName = 'there';
+    let planUnvisited: { id: string; name: string; type: string; areaName: string | null; wardId: string; wardName: string | null; plannedVisitAt: Date | null }[] = [];
+    let planItinerary: { id: string; name: string; type: string; areaName: string | null; wardId: string; wardName: string | null; plannedVisitAt: Date; plannedPurpose: string | null }[] = [];
+    if (action === 'plan') {
+      const me = await tx
+        .select({ fullName: people.fullName })
+        .from(people)
+        .where(eq(people.id, claims.sub))
+        .limit(1);
+      if (me[0]?.fullName) firstName = me[0].fullName.split(' ')[0]!;
+
+      planUnvisited = await tx
+        .select({
+          id: communitySites.id,
+          name: communitySites.name,
+          type: communitySites.type,
+          areaName: communitySites.areaName,
+          wardId: communitySites.wardId,
+          wardName: wards.name,
+          plannedVisitAt: communitySites.plannedVisitAt,
+        })
+        .from(communitySites)
+        .leftJoin(wards, eq(wards.id, communitySites.wardId))
+        .where(and(isNull(communitySites.deletedAt), eq(communitySites.visited, false)))
+        .orderBy(asc(wards.name), asc(communitySites.areaName), asc(communitySites.name));
+
+      const planned = await tx
+        .select({
+          id: communitySites.id,
+          name: communitySites.name,
+          type: communitySites.type,
+          areaName: communitySites.areaName,
+          wardId: communitySites.wardId,
+          wardName: wards.name,
+          plannedVisitAt: communitySites.plannedVisitAt,
+          plannedPurpose: communitySites.plannedPurpose,
+        })
+        .from(communitySites)
+        .leftJoin(wards, eq(wards.id, communitySites.wardId))
+        .where(and(isNull(communitySites.deletedAt), isNotNull(communitySites.plannedVisitAt)))
+        .orderBy(asc(communitySites.plannedVisitAt));
+      planItinerary = planned.filter((p): p is typeof p & { plannedVisitAt: Date } => p.plannedVisitAt != null);
+    }
+
+    return { wardRows, meetingRows, activityRows, peopleMap, contactRows, unvisitedSites, unvisitedTotal, firstName, planUnvisited, planItinerary };
   });
 
   // Compose entries (meetings + activities merged into one sorted feed)
@@ -298,14 +382,29 @@ export default async function MeetingsPage({ searchParams }: PageProps) {
       {searchParams.activityError && (
         <Flash tone="danger">{searchParams.activityError}</Flash>
       )}
+      {searchParams.planError && (
+        <Flash tone="danger">{decodeURIComponent(searchParams.planError)}</Flash>
+      )}
 
       {/* ── Mode tabs ───────────────────────────────────────────────── */}
       <nav className="flex flex-wrap gap-2">
+        <ModeTab href="/meetings?action=plan" active={action === 'plan'} tone="orange">🗺️ Plan my month</ModeTab>
         <ModeTab href="/meetings" active={!action && !view}>📅 Calendar</ModeTab>
-        <ModeTab href="/meetings?action=new" active={action === 'new'} tone="orange">+ Schedule meeting</ModeTab>
-        <ModeTab href="/meetings?action=new-activity" active={action === 'new-activity'} tone="orange">+ Activity at site</ModeTab>
+        <ModeTab href="/meetings?action=new" active={action === 'new'}>+ Schedule meeting</ModeTab>
+        <ModeTab href="/meetings?action=new-activity" active={action === 'new-activity'}>+ Activity at site</ModeTab>
         <ModeTab href="/meetings?view=unvisited" active={view === 'unvisited'}>🎯 Unvisited sites</ModeTab>
       </nav>
+
+      {/* ── Plan my month — the PA itinerary builder ────────────────────── */}
+      {action === 'plan' && (
+        <PlanMyMonth
+          firstName={data.firstName}
+          unvisited={data.planUnvisited}
+          itinerary={data.planItinerary}
+          openWard={searchParams.open ?? ''}
+          now={now}
+        />
+      )}
 
       {/* ── Schedule meeting form ───────────────────────────────────── */}
       {action === 'new' && (
@@ -801,6 +900,288 @@ function UnvisitedSitesFinder({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Plan my month — the PA itinerary builder ─────────────────────────────────
+//
+// Two stacked jobs on one screen, no JS required:
+//   1. "Your itinerary" board — everything already planned, grouped by date,
+//      with overdue flagged. Each row can be moved, removed, or marked visited.
+//   2. "Where to next?" — every unvisited place clustered Ward → Area inside
+//      native <details> accordions. Each place is a one-tap: pick a date → Add.
+
+type PlanSite = {
+  id: string; name: string; type: string; areaName: string | null;
+  wardId: string; wardName: string | null; plannedVisitAt: Date | null;
+};
+type ItinSite = PlanSite & { plannedVisitAt: Date; plannedPurpose: string | null };
+
+function PlanMyMonth({
+  firstName, unvisited, itinerary, openWard, now,
+}: {
+  firstName: string;
+  unvisited: PlanSite[];
+  itinerary: ItinSite[];
+  openWard: string;
+  now: Date;
+}) {
+  const monthLabel = now.toLocaleDateString('en-KE', { month: 'long', year: 'numeric' });
+  const todayStr = toDateInput(now);
+  const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  // Itinerary buckets.
+  const overdue = itinerary.filter((i) => i.plannedVisitAt < startOfToday);
+  const upcoming = itinerary.filter((i) => i.plannedVisitAt >= startOfToday);
+  const plannedThisMonth = itinerary.filter((i) => i.plannedVisitAt >= monthStart && i.plannedVisitAt < monthEnd);
+  const wardsThisMonth = new Set(plannedThisMonth.map((i) => i.wardId)).size;
+
+  // Upcoming grouped by day.
+  const byDay = new Map<string, ItinSite[]>();
+  upcoming.forEach((i) => {
+    const key = i.plannedVisitAt.toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric', month: 'short' });
+    (byDay.get(key) ?? byDay.set(key, []).get(key))!.push(i);
+  });
+
+  // Unvisited clustered Ward → Area.
+  const wardMap = new Map<string, { wardName: string; sites: PlanSite[] }>();
+  unvisited.forEach((s) => {
+    const g = wardMap.get(s.wardId) ?? { wardName: s.wardName ?? 'Unknown ward', sites: [] };
+    g.sites.push(s);
+    wardMap.set(s.wardId, g);
+  });
+  const wardGroups = Array.from(wardMap.entries());
+  const plannedIds = new Set(itinerary.map((i) => i.id));
+
+  const redirect = (wardId: string) => `/meetings?action=plan&open=${wardId}#w-${wardId}`;
+
+  return (
+    <div className="space-y-6">
+      {/* Greeting + at-a-glance stats */}
+      <div className="rounded-2xl border border-brand-orangePrimary/40 bg-gradient-to-br from-brand-orangePrimary/15 via-brand-cardBg to-brand-cardBg p-5">
+        <h2 className="text-xl font-extrabold text-brand-textActive">
+          Habari, {firstName} 👋 — what&apos;s the plan for {monthLabel}?
+        </h2>
+        <p className="text-sm text-brand-textBody mt-1">
+          Pick the places you want to reach below and drop a date on each. They&apos;ll line up into your itinerary — your PA keeps the running list right here.
+        </p>
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Stat label="Planned this month" value={plannedThisMonth.length} tone="orange" />
+          <Stat label="Wards covered" value={wardsThisMonth} tone="teal" />
+          <Stat label="Overdue" value={overdue.length} tone={overdue.length ? 'danger' : 'muted'} />
+          <Stat label="Still to schedule" value={unvisited.filter((s) => !plannedIds.has(s.id)).length} tone="muted" />
+        </div>
+      </div>
+
+      {/* ── Itinerary board ─────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-brand-skyBlue">📋 Your itinerary</h3>
+          <span className="text-xs text-brand-textMuted">· {itinerary.length} place{itinerary.length === 1 ? '' : 's'} lined up</span>
+        </div>
+
+        {itinerary.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-brand-border bg-brand-cardBg p-8 text-center">
+            <p className="text-sm text-brand-textMuted">
+              Nothing planned yet. Scroll down to <strong className="text-brand-textActive">“Where to next?”</strong>, pick a place, choose a date, and it lands here.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {overdue.length > 0 && (
+              <div className="rounded-xl border border-brand-danger/50 bg-brand-danger/5 p-3 space-y-2">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-brand-danger">⚠ Overdue — date has passed, still not logged</div>
+                {overdue.map((i) => (
+                  <ItineraryRow key={i.id} site={i} todayStr={todayStr} redirect={redirect(i.wardId)} overdue />
+                ))}
+              </div>
+            )}
+            {Array.from(byDay.entries()).map(([day, items]) => (
+              <div key={day} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center rounded-md bg-brand-tealBlue/15 px-2 py-0.5 text-xs font-bold text-brand-tealBlue">{day}</span>
+                  <span className="text-[11px] text-brand-textMuted">{items.length} stop{items.length === 1 ? '' : 's'}</span>
+                </div>
+                {items.map((i) => (
+                  <ItineraryRow key={i.id} site={i} todayStr={todayStr} redirect={redirect(i.wardId)} />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Where to next — pick places to add ──────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-brand-orangeBright">🎯 Where to next?</h3>
+          <span className="text-xs text-brand-textMuted">· {unvisited.length} unvisited place{unvisited.length === 1 ? '' : 's'}, grouped by ward &amp; area</span>
+        </div>
+
+        {wardGroups.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-brand-border bg-brand-cardBg p-8 text-center">
+            <p className="text-sm text-brand-textMuted">🎉 Every place has been visited. Nothing left to schedule.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {wardGroups.map(([wardId, g]) => {
+              const plannedInWard = g.sites.filter((s) => plannedIds.has(s.id)).length;
+              // Cluster this ward's sites by area.
+              const areaMap = new Map<string, PlanSite[]>();
+              g.sites.forEach((s) => {
+                const key = s.areaName?.trim() || 'Unspecified area';
+                (areaMap.get(key) ?? areaMap.set(key, []).get(key))!.push(s);
+              });
+              const areas = Array.from(areaMap.entries());
+              return (
+                <details
+                  key={wardId}
+                  id={`w-${wardId}`}
+                  open={openWard === wardId}
+                  className="group rounded-xl border border-brand-border bg-brand-cardBg overflow-hidden"
+                >
+                  <summary className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer select-none hover:bg-black/5">
+                    <span className="flex items-center gap-2">
+                      <span className="text-brand-textMuted transition-transform group-open:rotate-90">▶</span>
+                      <span className="text-sm font-bold text-brand-textActive">{g.wardName}</span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      {plannedInWard > 0 && (
+                        <span className="rounded-full bg-brand-tealBlue/15 px-2 py-0.5 text-[10px] font-bold text-brand-tealBlue">{plannedInWard} planned</span>
+                      )}
+                      <span className="rounded-full bg-brand-orangePrimary/15 px-2 py-0.5 text-[10px] font-bold text-brand-orangeBright">{g.sites.length} to visit</span>
+                    </span>
+                  </summary>
+
+                  <div className="border-t border-brand-border/60 divide-y divide-brand-border/40">
+                    {areas.map(([area, sites]) => (
+                      <div key={area} className="px-4 py-3">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-brand-textMuted mb-2">
+                          📍 {area} <span className="text-brand-textMuted/70">· {sites.length}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {sites.map((s) => (
+                            <PickSiteRow key={s.id} site={s} todayStr={todayStr} redirect={redirect(wardId)} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+// One planned stop in the itinerary board — move date, remove, or log the visit.
+function ItineraryRow({
+  site, todayStr, redirect, overdue,
+}: {
+  site: ItinSite; todayStr: string; redirect: string; overdue?: boolean;
+}) {
+  const m = typeMeta(site.type);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-border bg-brand-cardBg px-3 py-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-brand-textActive truncate">{m.icon} {site.name}</span>
+          {overdue && (
+            <span className="text-[10px] font-bold uppercase text-brand-danger">
+              {site.plannedVisitAt.toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}
+            </span>
+          )}
+        </div>
+        <div className="text-[11px] text-brand-textMuted truncate">
+          {m.label} · {site.wardName ?? '—'}{site.areaName ? ` · ${site.areaName}` : ''}
+          {site.plannedPurpose ? ` · ${site.plannedPurpose}` : ''}
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5">
+        {/* Move to a new date */}
+        <form method="post" action={`/api/sites/${site.id}/quick-plan`} className="flex items-center gap-1">
+          <input type="hidden" name="redirect" value={redirect} />
+          <input type="date" name="plannedVisitAt" defaultValue={toDateInput(site.plannedVisitAt)} min={todayStr}
+            className="bg-brand-cardBgHeavy border border-brand-border rounded-md px-2 py-1 text-xs text-brand-textActive focus:outline-none focus:border-brand-skyBlue" />
+          <button className="px-2 py-1 rounded-md bg-brand-tealBlue text-white text-[11px] font-semibold hover:bg-brand-tealBright">Move</button>
+        </form>
+        {/* Mark visited — opens the ward's site tab to log the full visit */}
+        <Link href={`/wards/${site.wardId}?tab=sites`}
+          className="px-2 py-1 rounded-md border border-brand-success/50 text-brand-success text-[11px] font-semibold hover:bg-brand-success/10">
+          ✓ Log
+        </Link>
+        {/* Remove from plan */}
+        <form method="post" action={`/api/sites/${site.id}/quick-plan`}>
+          <input type="hidden" name="redirect" value={redirect} />
+          <input type="hidden" name="clear" value="1" />
+          <button className="px-2 py-1 rounded-md border border-brand-border text-brand-textMuted text-[11px] font-semibold hover:text-brand-danger hover:border-brand-danger/50">✕</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// One unvisited place — pick a date and add it (or update/remove if already planned).
+function PickSiteRow({
+  site, todayStr, redirect,
+}: {
+  site: PlanSite; todayStr: string; redirect: string;
+}) {
+  const m = typeMeta(site.type);
+  const planned = site.plannedVisitAt != null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="min-w-0 flex items-center gap-2">
+        <span className="text-sm text-brand-textActive truncate">{m.icon} {site.name}</span>
+        <span className="text-[10px] uppercase tracking-wider text-brand-textMuted shrink-0">{m.label}</span>
+        {planned && (
+          <span className="rounded-full bg-brand-tealBlue/15 px-2 py-0.5 text-[10px] font-bold text-brand-tealBlue shrink-0">
+            ✓ {site.plannedVisitAt!.toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <form method="post" action={`/api/sites/${site.id}/quick-plan`} className="flex items-center gap-1">
+          <input type="hidden" name="redirect" value={redirect} />
+          <input type="date" name="plannedVisitAt" min={todayStr}
+            defaultValue={planned ? toDateInput(site.plannedVisitAt!) : ''}
+            className="bg-brand-cardBgHeavy border border-brand-border rounded-md px-2 py-1 text-xs text-brand-textActive focus:outline-none focus:border-brand-skyBlue" />
+          <button className={[
+            'px-2.5 py-1 rounded-md text-white text-[11px] font-bold transition',
+            planned ? 'bg-brand-tealBlue hover:bg-brand-tealBright' : 'bg-brand-orangePrimary hover:bg-brand-orangeBright',
+          ].join(' ')}>
+            {planned ? 'Update' : '＋ Add'}
+          </button>
+        </form>
+        {planned && (
+          <form method="post" action={`/api/sites/${site.id}/quick-plan`}>
+            <input type="hidden" name="redirect" value={redirect} />
+            <input type="hidden" name="clear" value="1" />
+            <button className="px-2 py-1 rounded-md border border-brand-border text-brand-textMuted text-[11px] hover:text-brand-danger hover:border-brand-danger/50">✕</button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: number; tone: 'orange' | 'teal' | 'danger' | 'muted' }) {
+  const toneCls = {
+    orange: 'text-brand-orangeBright',
+    teal: 'text-brand-tealBlue',
+    danger: 'text-brand-danger',
+    muted: 'text-brand-textActive',
+  }[tone];
+  return (
+    <div className="rounded-xl border border-brand-border bg-brand-cardBg px-3 py-2.5">
+      <div className={`text-2xl font-extrabold ${toneCls}`}>{value}</div>
+      <div className="text-[10px] uppercase tracking-wider text-brand-textMuted font-bold mt-0.5">{label}</div>
     </div>
   );
 }

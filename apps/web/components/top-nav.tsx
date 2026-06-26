@@ -291,9 +291,9 @@ export function TopNav({ user, wards }: Props) {
           )}
         </nav>
 
-        {/* Schedule CTA */}
+        {/* Schedule CTA — opens the Plan-my-month itinerary builder */}
         <Link
-          href="/meetings?action=new"
+          href="/meetings?action=plan"
           className="hidden md:inline-flex items-center gap-1.5 shrink-0 ml-auto px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-brand-rust text-white hover:bg-brand-burnt transition"
         >
           <PlusIcon /> Schedule
@@ -433,11 +433,11 @@ export function TopNav({ user, wards }: Props) {
 
               <div className="border-t border-brand-border/60 mt-2 pt-2 px-4 space-y-2">
                 <Link
-                  href="/meetings?action=new"
+                  href="/meetings?action=plan"
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-brand-rust text-white text-xs font-bold uppercase tracking-wider hover:bg-brand-burnt transition"
                 >
-                  <PlusIcon /> Schedule a meeting
+                  <PlusIcon /> Plan my month
                 </Link>
                 <div className="flex items-center justify-between px-1">
                   <span className="text-xs font-semibold text-brand-textBody">Appearance</span>
