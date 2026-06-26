@@ -52,6 +52,8 @@ export const people = pgTable(
     // Null for constituency-wide roles (candidate, campaign_manager, chief_strategist,
     // constituency_coordinator, media_head, comms_head, patron_ceo, tech_lead, finance_lead).
     wardId: uuid('ward_id').references(() => wards.id, { onDelete: 'restrict' }),
+    // Village the team member is based in / resides in (app-layer FK to villages.id).
+    homeVillageId: uuid('home_village_id'),
     photoUrl: text('photo_url'),
     // Campaign team ID for ID cards / barcodes — ward-initial prefix + sequence
     // (e.g. FRT001). Generated from ward + seniority; see tools/generate-team-ids.cjs.

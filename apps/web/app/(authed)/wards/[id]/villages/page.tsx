@@ -85,8 +85,10 @@ export default async function WardVillagesPage({ params }: { params: { id: strin
           {sectionGroups.length} section{sectionGroups.length === 1 ? '' : 's'} ·{' '}
           {totalLeaders} community leader{totalLeaders === 1 ? '' : 's'}. Tap a village to see its people &amp; issues.
         </p>
-        <div className="pt-1">
+        <div className="pt-1 flex flex-wrap items-center gap-2">
           <AddVillageForm wardId={wardId} wardName={data.ward.name} />
+          <Link href="/roads" className="text-xs font-semibold px-3 py-1.5 rounded-full border border-brand-border text-brand-textBody hover:border-brand-burnt hover:text-brand-burnt transition">🛣️ Roads (MP projects)</Link>
+          <Link href="/team/assign-villages" className="text-xs font-semibold px-3 py-1.5 rounded-full border border-brand-border text-brand-textBody hover:border-brand-teal hover:text-brand-teal transition">👥 Assign team to villages</Link>
         </div>
       </header>
 

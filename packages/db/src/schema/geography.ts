@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, index, integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, numeric, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { geometryMultiPolygon, geometryPoint, geometryPolygon } from '../types/geometry';
 
 // Geographic hierarchy (SRS §3.3, ARC §6).
@@ -144,8 +144,38 @@ export const pollingStations = pgTable(
   }),
 );
 
+// ---- roads ------------------------------------------------------------------
+// The MP's road projects, listed village → village. Village FKs are app-layer
+// (nullable). Free-text status/funding/surface kept simple for quick data entry.
+
+export const roads = pgTable(
+  'roads',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    wardId: uuid('ward_id').references(() => wards.id, { onDelete: 'set null' }),
+    fromVillageId: uuid('from_village_id'),
+    toVillageId: uuid('to_village_id'),
+    name: text('name').notNull(),
+    status: text('status'),          // proposed | ongoing | completed | stalled
+    funding: text('funding'),        // ng_cdf | county | national | other
+    mpProject: boolean('mp_project').notNull().default(true),
+    surface: text('surface'),        // tarmac | murram | earth | cabro | graded
+    lengthKm: numeric('length_km'),
+    notes: text('notes'),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => ({
+    wardIdx: index('roads_ward_idx').on(t.wardId),
+    fromIdx: index('roads_from_idx').on(t.fromVillageId),
+    toIdx: index('roads_to_idx').on(t.toVillageId),
+  }),
+);
+
 export type Constituency = typeof constituencies.$inferSelect;
 export type Ward = typeof wards.$inferSelect;
 export type SubLocation = typeof subLocations.$inferSelect;
 export type Village = typeof villages.$inferSelect;
 export type PollingStation = typeof pollingStations.$inferSelect;
+export type Road = typeof roads.$inferSelect;

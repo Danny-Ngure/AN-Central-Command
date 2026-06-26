@@ -1,5 +1,5 @@
-import { villages, villageIssues, communityLeaders, communitySites, pollingStations, wards } from '@an/db';
-import { and, eq, isNull, desc, asc } from 'drizzle-orm';
+import { villages, villageIssues, communityLeaders, communitySites, pollingStations, people, roads, wards } from '@an/db';
+import { and, eq, isNull, desc, asc, or } from 'drizzle-orm';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
@@ -70,7 +70,7 @@ export default async function VillagePage({ params }: { params: { id: string; vi
       .select({ id: villages.id, name: villages.name, section: villages.section, wardId: villages.wardId, populationEstimate: villages.populationEstimate })
       .from(villages).where(eq(villages.id, villageId)).limit(1);
     const village = villageRows[0] ?? null;
-    if (!village) return { ward: null, village: null, leaders: [], issues: [], sites: [], stations: [] };
+    if (!village) return { ward: null, village: null, leaders: [], issues: [], sites: [], stations: [], team: [], roadRows: [] };
 
     const wardRows = await tx.select({ id: wards.id, name: wards.name }).from(wards).where(eq(wards.id, village.wardId)).limit(1);
 
@@ -98,7 +98,21 @@ export default async function VillagePage({ params }: { params: { id: string; vi
     const vKey = norm(village.name);
     const stations = vKey.length >= 4 ? wardStations.filter((s) => norm(s.name).includes(vKey)) : [];
 
-    return { ward: wardRows[0] ?? null, village, leaders, issues, sites, stations };
+    // Team members based in this village.
+    const team = await tx
+      .select({ id: people.id, fullName: people.fullName, role: people.role, phone: people.phone })
+      .from(people)
+      .where(and(eq(people.homeVillageId, villageId), eq(people.active, true), isNull(people.deletedAt)))
+      .orderBy(asc(people.fullName));
+
+    // Roads touching this village (from or to).
+    const roadRows = await tx
+      .select({ id: roads.id, name: roads.name, status: roads.status, funding: roads.funding, fromVillageId: roads.fromVillageId, toVillageId: roads.toVillageId })
+      .from(roads)
+      .where(and(isNull(roads.deletedAt), or(eq(roads.fromVillageId, villageId), eq(roads.toVillageId, villageId))))
+      .orderBy(asc(roads.name));
+
+    return { ward: wardRows[0] ?? null, village, leaders, issues, sites, stations, team, roadRows };
   });
 
   if (!data.village) notFound();
@@ -118,6 +132,7 @@ export default async function VillagePage({ params }: { params: { id: string; vi
           {data.village.section && <>📍 {data.village.section} · </>}
           {data.sites.length} site{data.sites.length === 1 ? '' : 's'} ·{' '}
           {data.stations.length} polling station{data.stations.length === 1 ? '' : 's'} ·{' '}
+          {data.team.length} team member{data.team.length === 1 ? '' : 's'} ·{' '}
           {data.leaders.length} leader{data.leaders.length === 1 ? '' : 's'} ·{' '}
           {data.issues.length} issue{data.issues.length === 1 ? '' : 's'}
           {data.village.populationEstimate != null && <> · ~{data.village.populationEstimate.toLocaleString()} people</>}
@@ -172,6 +187,59 @@ export default async function VillagePage({ params }: { params: { id: string; vi
                 <span className="text-base">🗳️</span>
                 <span className="text-sm font-semibold text-brand-textActive truncate">{s.name}</span>
               </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Team members based here */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-brand-gold uppercase tracking-wide">Team members based here</h2>
+          <Link href="/team/assign-villages" className="text-[11px] font-semibold text-brand-aqua hover:text-brand-skyBlue">Assign →</Link>
+        </div>
+        {data.team.length === 0 ? (
+          <p className="text-sm text-brand-textMuted italic">No team members assigned to this village yet. <Link href="/team/assign-villages" className="text-brand-aqua hover:underline not-italic">Assign some →</Link></p>
+        ) : (
+          <div className="rounded-xl border border-brand-border bg-brand-cardBg overflow-hidden grid grid-cols-1 sm:grid-cols-2">
+            {data.team.map((p) => {
+              const initials = p.fullName.split(' ').filter(Boolean).slice(0, 2).map((s) => s[0]).join('').toUpperCase();
+              return (
+                <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 border-b border-r border-brand-border/30">
+                  <span className="shrink-0 w-9 h-9 rounded-full bg-brand-gold/20 text-brand-burnt flex items-center justify-center text-[11px] font-bold">{initials}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-brand-textActive truncate">{p.fullName}</div>
+                    <div className="text-[11px] text-brand-textMuted truncate">{p.role.replace(/_/g, ' ')}</div>
+                  </div>
+                  {p.phone && <PhoneActions phone={p.phone} size="sm" />}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Roads touching this village */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-brand-brown uppercase tracking-wide">Roads</h2>
+          <Link href="/roads" className="text-[11px] font-semibold text-brand-aqua hover:text-brand-skyBlue">All roads →</Link>
+        </div>
+        {data.roadRows.length === 0 ? (
+          <p className="text-sm text-brand-textMuted italic">No roads recorded through this village. <Link href="/roads" className="text-brand-aqua hover:underline not-italic">Add one →</Link></p>
+        ) : (
+          <div className="space-y-2">
+            {data.roadRows.map((r) => (
+              <div key={r.id} className="rounded-lg border border-brand-border bg-brand-cardBg p-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-semibold text-brand-textActive">🛣️ {r.name}</div>
+                  {(r.status || r.funding) && (
+                    <div className="text-[11px] text-brand-textMuted mt-0.5">
+                      {r.status}{r.status && r.funding ? ' · ' : ''}{r.funding === 'ng_cdf' ? 'NG-CDF' : r.funding}
+                    </div>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}
