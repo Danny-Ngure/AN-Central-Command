@@ -1,5 +1,5 @@
-import { eq } from 'drizzle-orm';
-import { db, people, wards } from '@an/db';
+import { eq, isNull, asc } from 'drizzle-orm';
+import { db, people, villages, wards } from '@an/db';
 import { AutoBreadcrumbs } from '@/components/auto-breadcrumbs';
 import { Countdown } from '@/components/countdown';
 import { QuickAdd } from '@/components/quick-add';
@@ -53,9 +53,16 @@ export default async function AuthedLayout({ children }: { children: React.React
     .from(wards)
     .orderBy(wards.name);
 
+  // All villages — feeds the "Villages" mega-menu (clustered by ward).
+  const allVillages = await db
+    .select({ id: villages.id, name: villages.name, wardId: villages.wardId, section: villages.section })
+    .from(villages)
+    .where(isNull(villages.deletedAt))
+    .orderBy(asc(villages.section), asc(villages.name));
+
   return (
     <div className="min-h-screen flex flex-col bg-brand-darkBg">
-      <TopNav user={{ fullName: person.fullName, role: person.role, wardName }} wards={allWards} />
+      <TopNav user={{ fullName: person.fullName, role: person.role, wardName }} wards={allWards} villages={allVillages} />
       {/* SRS FR-090 — hero countdown strip, full-width below the main navbar. */}
       <Countdown />
       <main className="flex-1 overflow-auto">

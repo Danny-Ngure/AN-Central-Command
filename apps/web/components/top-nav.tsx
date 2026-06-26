@@ -35,6 +35,13 @@ interface Ward {
   name: string;
 }
 
+interface Village {
+  id: string;
+  name: string;
+  wardId: string;
+  section: string | null;
+}
+
 interface SubLink {
   href: string;
   label: string;
@@ -92,9 +99,10 @@ function wardLinks(id: string): SubLink[] {
 interface Props {
   user: { fullName: string; role: string; wardName: string | null };
   wards: Ward[];
+  villages?: Village[];
 }
 
-export function TopNav({ user, wards }: Props) {
+export function TopNav({ user, wards, villages = [] }: Props) {
   const pathname = usePathname() ?? '';
   const privileged = PRIVILEGED_ROLES.has(user.role);
 
@@ -108,6 +116,8 @@ export function TopNav({ user, wards }: Props) {
   const activeGroup =
     pathname === '/dashboard'
       ? 'home'
+      : pathname.includes('/villages')
+        ? 'villages'
       : pathname.startsWith('/wards') || pathname.startsWith('/issues') || pathname.startsWith('/community')
         ? 'wards'
         : pathname.startsWith('/voters')
@@ -164,6 +174,12 @@ export function TopNav({ user, wards }: Props) {
 
   // Polling Stations is now a top-level dropdown, organised by ward.
   const stationLinks: SubLink[] = wards.map((w) => ({ href: `/wards/${w.id}?tab=stations`, label: w.name }));
+
+  // Villages clustered by ward — for the Villages mega-menu.
+  const villagesByWard = wards.map((w) => ({
+    ward: w,
+    villages: villages.filter((v) => v.wardId === w.id),
+  })).filter((g) => g.villages.length > 0);
 
   return (
     <header className="sticky top-0 z-40 border-b border-brand-border bg-brand-cardBg/95 backdrop-blur-md">
@@ -230,6 +246,47 @@ export function TopNav({ user, wards }: Props) {
                     <span className="px-2 text-[12px] text-brand-textMuted">All-wards summary</span>
                     <span className="px-2 text-[12px] text-brand-textMuted">Coverage · churches · mosques</span>
                   </Link>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Villages mega-menu — clustered by ward */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setOpenMenu((m) => (m === 'villages' ? null : 'villages'))}
+              aria-expanded={openMenu === 'villages'}
+              aria-haspopup="true"
+              className={topBtn('villages')}
+            >
+              Villages <Caret open={openMenu === 'villages'} />
+            </button>
+            {openMenu === 'villages' && (
+              <div className="absolute left-0 mt-2 z-50 w-[min(94vw,820px)] rounded-xl border border-brand-borderStrong bg-brand-cardBg shadow-2xl p-3">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 max-h-[70vh] overflow-y-auto">
+                  {villagesByWard.map(({ ward, villages: vs }) => (
+                    <div key={ward.id} className="rounded-lg border border-brand-border bg-brand-darkBg/40 p-2">
+                      <Link
+                        href={`/wards/${ward.id}/villages`}
+                        className="flex items-center justify-between px-2 py-1 rounded text-sm font-bold text-brand-textActive hover:text-brand-burnt"
+                      >
+                        {ward.name}
+                        <span className="text-[10px] font-semibold text-brand-textMuted">{vs.length}</span>
+                      </Link>
+                      <div className="mt-1 flex flex-col max-h-56 overflow-y-auto">
+                        {vs.map((v) => (
+                          <Link
+                            key={v.id}
+                            href={`/wards/${ward.id}/villages/${v.id}`}
+                            className="px-2 py-1 rounded text-[12px] text-brand-textMuted hover:text-brand-textActive hover:bg-brand-burnt/15 transition truncate"
+                          >
+                            {v.name}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -376,6 +433,24 @@ export function TopNav({ user, wards }: Props) {
                         <MobileLink key={s.href} href={s.href} label={s.label} deep onNav={() => setMobileOpen(false)} />
                       ))}
                   </div>
+                ))}
+              </MobileSection>
+
+              {/* Villages accordion (by ward → villages page) */}
+              <MobileSection
+                label="Villages"
+                active={activeGroup === 'villages'}
+                open={mobileSection === 'villages'}
+                onToggle={() => setMobileSection((s) => (s === 'villages' ? null : 'villages'))}
+              >
+                {villagesByWard.map(({ ward, villages: vs }) => (
+                  <MobileLink
+                    key={ward.id}
+                    href={`/wards/${ward.id}/villages`}
+                    label={`${ward.name} (${vs.length})`}
+                    sub
+                    onNav={() => setMobileOpen(false)}
+                  />
                 ))}
               </MobileSection>
 
