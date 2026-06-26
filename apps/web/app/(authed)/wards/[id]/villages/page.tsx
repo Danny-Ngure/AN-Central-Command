@@ -1,4 +1,4 @@
-import { villages, villageIssues, communityLeaders, wards } from '@an/db';
+import { villages, villageIssues, communityLeaders, communitySites, wards } from '@an/db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -45,13 +45,20 @@ export default async function WardVillagesPage({ params }: { params: { id: strin
       .where(and(eq(communityLeaders.wardId, wardId), isNull(communityLeaders.deletedAt)))
       .groupBy(communityLeaders.villageId);
 
-    return { ward: wardRows[0] ?? null, villageRows, issueCounts, leaderCounts };
+    const siteCounts = await tx
+      .select({ vid: communitySites.villageId, c: sql<number>`count(*)::int` })
+      .from(communitySites)
+      .where(and(eq(communitySites.wardId, wardId), isNull(communitySites.deletedAt)))
+      .groupBy(communitySites.villageId);
+
+    return { ward: wardRows[0] ?? null, villageRows, issueCounts, leaderCounts, siteCounts };
   });
 
   if (!data.ward) notFound();
 
   const issueMap = new Map(data.issueCounts.map((r) => [r.vid, r.c]));
   const leaderMap = new Map(data.leaderCounts.map((r) => [r.vid, r.c]));
+  const siteMap = new Map(data.siteCounts.map((r) => [r.vid, r.c]));
   const totalLeaders = data.leaderCounts.reduce((s, r) => s + r.c, 0);
 
   // Group villages by section (preserving the section-then-name sort). A global
@@ -107,6 +114,7 @@ export default async function WardVillagesPage({ params }: { params: { id: strin
                   const tone = VILLAGE_TONES[tileIndex++ % VILLAGE_TONES.length];
                   const leaders = leaderMap.get(v.id) ?? 0;
                   const issues = issueMap.get(v.id) ?? 0;
+                  const sites = siteMap.get(v.id) ?? 0;
                   return (
                     <Link
                       key={v.id}
@@ -120,7 +128,7 @@ export default async function WardVillagesPage({ params }: { params: { id: strin
                         </span>
                         <h2 className={`text-sm font-extrabold leading-tight ${tone.head} line-clamp-2`}>{v.name}</h2>
                         <div className="text-[10px] font-semibold text-brand-textMuted">
-                          {leaders} leader{leaders === 1 ? '' : 's'}
+                          {sites} site{sites === 1 ? '' : 's'} · {leaders} leader{leaders === 1 ? '' : 's'}
                           {issues > 0 && <span className="text-brand-rust"> · {issues} issue{issues === 1 ? '' : 's'}</span>}
                         </div>
                       </div>
