@@ -339,8 +339,8 @@ function TabCycle({ election, wardWeights }: { election: HistoricalElection; war
         </Caption>
       </ChartCard>
 
-      {/* Per-ward projection — only for cycles with a complete official slate */}
-      {election.complete && wardWeights && wardWeights.length > 0 && (
+      {/* Per-ward projection — any cycle with at least the top two candidates' votes */}
+      {wardWeights && wardWeights.length > 0 && election.candidates.filter((c) => c.votes != null).length >= 2 && (
         <PerWardProjection election={election} wardWeights={wardWeights} />
       )}
 
@@ -376,8 +376,14 @@ function PerWardProjection({
     .slice(0, 3) as Array<HistoricalCandidate & { votes: number }>;
   const palette = [COLORS.teal, COLORS.amber, COLORS.aqua, COLORS.sky, COLORS.emerald];
 
-  // Real constituency shares (percentages) of the top-3.
-  const totalAll = election.candidates.reduce((s, c) => s + (c.votes ?? 0), 0) || 1;
+  // For a complete cycle, % is share of ALL valid votes. For a partial cycle
+  // (only top candidates loaded), % is head-to-head among the loaded candidates —
+  // labelled as such so it isn't mistaken for a full-slate share.
+  const headToHead = !election.complete;
+  const shareBase = headToHead
+    ? top3.reduce((s, c) => s + c.votes, 0) || 1
+    : (election.candidates.reduce((s, c) => s + (c.votes ?? 0), 0) || 1);
+  const totalAll = shareBase;
   const winnerC = top3[0];
   const runnerC = top3[1];
   const sharePct = (v: number) => (v / totalAll) * 100;
@@ -392,8 +398,9 @@ function PerWardProjection({
     >
       <div className="rounded-lg border border-brand-gold/50 bg-brand-gold/10 px-3 py-2 text-[11px] text-brand-textBody mb-4">
         ⚠ <strong>Estimate, not official.</strong> Per-ward MP tallies aren&apos;t published. Bars/pies distribute the
-        confirmed constituency result across wards by registered-voter weight (assumes each ward votes like the
-        constituency average). The <strong>ward-weight pie is real data</strong>.
+        confirmed votes across wards by registered-voter weight (assumes each ward votes like the constituency average).
+        The <strong>ward-weight pie is real data</strong>.
+        {headToHead && <> Percentages here are <strong>head-to-head between the top {top3.length}</strong> (the other {election.year} candidates&apos; tallies aren&apos;t loaded).</>}
       </div>
 
       {/* Real data: ward electoral weight */}
@@ -415,7 +422,7 @@ function PerWardProjection({
 
       {/* Constituency top-3 — real percentages + margin */}
       <div className="rounded-lg border border-brand-border bg-brand-cardBgHeavy/40 p-3 mb-4">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-brand-textMuted mb-2">Constituency result (real %)</div>
+        <div className="text-[11px] font-bold uppercase tracking-wider text-brand-textMuted mb-2">{headToHead ? `Top ${top3.length} — head-to-head %` : 'Constituency result (real %)'}</div>
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
           {top3.map((c, i) => (
             <span key={c.name} className="text-brand-textBody">
