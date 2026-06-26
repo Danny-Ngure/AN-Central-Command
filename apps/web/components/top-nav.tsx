@@ -263,31 +263,23 @@ export function TopNav({ user, wards, villages = [] }: Props) {
               Villages <Caret open={openMenu === 'villages'} />
             </button>
             {openMenu === 'villages' && (
-              <div className="absolute left-0 mt-2 z-50 w-[min(94vw,820px)] rounded-xl border border-brand-borderStrong bg-brand-cardBg shadow-2xl p-3">
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 max-h-[70vh] overflow-y-auto">
-                  {villagesByWard.map(({ ward, villages: vs }) => (
-                    <div key={ward.id} className="rounded-lg border border-brand-border bg-brand-darkBg/40 p-2">
-                      <Link
-                        href={`/wards/${ward.id}/villages`}
-                        className="flex items-center justify-between px-2 py-1 rounded text-sm font-bold text-brand-textActive hover:text-brand-burnt"
-                      >
-                        {ward.name}
-                        <span className="text-[10px] font-semibold text-brand-textMuted">{vs.length}</span>
-                      </Link>
-                      <div className="mt-1 flex flex-col max-h-56 overflow-y-auto">
-                        {vs.map((v) => (
-                          <Link
-                            key={v.id}
-                            href={`/wards/${ward.id}/villages/${v.id}`}
-                            className="px-2 py-1 rounded text-[12px] text-brand-textBody hover:text-brand-burnt hover:bg-brand-burnt/15 transition truncate"
-                          >
-                            {v.name}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="absolute left-0 mt-2 z-50 w-72 rounded-xl border border-brand-borderStrong bg-brand-cardBg shadow-2xl p-2">
+                <Link
+                  href="/villages"
+                  className="flex items-center gap-2 px-3 py-2 mb-1 rounded-lg text-xs font-bold uppercase tracking-wider text-brand-burnt hover:bg-black/5"
+                >
+                  🗺️ All-villages map →
+                </Link>
+                {villagesByWard.map(({ ward, villages: vs }) => (
+                  <Link
+                    key={ward.id}
+                    href={`/wards/${ward.id}/villages`}
+                    className="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-brand-textBody hover:text-brand-textActive hover:bg-brand-burnt/15 transition"
+                  >
+                    <span className="font-semibold">{ward.name}</span>
+                    <span className="text-[11px] text-brand-textMuted">{vs.length} villages</span>
+                  </Link>
+                ))}
               </div>
             )}
           </div>
@@ -443,11 +435,12 @@ export function TopNav({ user, wards, villages = [] }: Props) {
                 open={mobileSection === 'villages'}
                 onToggle={() => setMobileSection((s) => (s === 'villages' ? null : 'villages'))}
               >
+                <MobileLink href="/villages" label="🗺️ All-villages map" sub onNav={() => setMobileOpen(false)} />
                 {villagesByWard.map(({ ward, villages: vs }) => (
                   <MobileLink
                     key={ward.id}
                     href={`/wards/${ward.id}/villages`}
-                    label={`${ward.name} (${vs.length})`}
+                    label={`${ward.name} — ${vs.length} villages`}
                     sub
                     onNav={() => setMobileOpen(false)}
                   />
