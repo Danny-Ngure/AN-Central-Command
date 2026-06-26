@@ -3815,6 +3815,92 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
   {
    "type": "Feature",
    "properties": {
+    "villageId": "d1b39161-dd75-48b5-a85d-0c8c78c8a8b8",
+    "name": "Gichanga",
+    "section": "Other localities",
+    "wardId": "22222222-0000-4000-8000-000000000005",
+    "wardName": "Ziwa La Ng'ombe"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       39.710457,
+       -4.024724
+      ],
+      [
+       39.7103,
+       -4.02412
+      ],
+      [
+       39.709211,
+       -4.024255
+      ],
+      [
+       39.709204,
+       -4.024263
+      ],
+      [
+       39.709204,
+       -4.025855
+      ],
+      [
+       39.710457,
+       -4.024724
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "villageId": "5fbc3579-c52a-4d17-83ba-a6e50809cbf8",
+    "name": "Tumaini",
+    "section": "Other localities",
+    "wardId": "22222222-0000-4000-8000-000000000005",
+    "wardName": "Ziwa La Ng'ombe"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       39.709204,
+       -4.024263
+      ],
+      [
+       39.709211,
+       -4.024255
+      ],
+      [
+       39.709074,
+       -4.023516
+      ],
+      [
+       39.708743,
+       -4.023516
+      ],
+      [
+       39.707988,
+       -4.023525
+      ],
+      [
+       39.708542,
+       -4.024293
+      ],
+      [
+       39.709204,
+       -4.024263
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
     "villageId": "00509b44-09ec-4290-8e4b-d541482a3184",
     "name": "Kangi",
     "section": "Shanzu / north",
@@ -4448,16 +4534,8 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
     "coordinates": [
      [
       [
-       39.71139,
-       -4.024085
-      ],
-      [
-       39.710502,
-       -4.023751
-      ],
-      [
-       39.710121,
-       -4.024449
+       39.710457,
+       -4.024724
       ],
       [
        39.711492,
@@ -4466,6 +4544,18 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
       [
        39.71139,
        -4.024085
+      ],
+      [
+       39.710502,
+       -4.023751
+      ],
+      [
+       39.7103,
+       -4.02412
+      ],
+      [
+       39.710457,
+       -4.024724
       ]
      ]
     ]
@@ -4530,12 +4620,16 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.026653
       ],
       [
-       39.70968,
-       -4.024622
+       39.709204,
+       -4.025855
       ],
       [
-       39.708835,
-       -4.023973
+       39.709204,
+       -4.024263
+      ],
+      [
+       39.708542,
+       -4.024293
       ],
       [
        39.70781,
@@ -4563,8 +4657,8 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
     "coordinates": [
      [
       [
-       39.708657,
-       -4.023518
+       39.707988,
+       -4.023525
       ],
       [
        39.70762,
@@ -4587,12 +4681,12 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.025092
       ],
       [
-       39.708835,
-       -4.023973
+       39.708542,
+       -4.024293
       ],
       [
-       39.708657,
-       -4.023518
+       39.707988,
+       -4.023525
       ]
      ]
     ]
@@ -4677,24 +4771,16 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.023516
       ],
       [
-       39.708743,
+       39.709074,
        -4.023516
       ],
       [
-       39.708657,
-       -4.023518
+       39.709211,
+       -4.024255
       ],
       [
-       39.708835,
-       -4.023973
-      ],
-      [
-       39.70968,
-       -4.024622
-      ],
-      [
-       39.710121,
-       -4.024449
+       39.7103,
+       -4.02412
       ],
       [
        39.710502,
@@ -4767,12 +4853,12 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.02557
       ],
       [
-       39.710121,
-       -4.024449
+       39.710457,
+       -4.024724
       ],
       [
-       39.70968,
-       -4.024622
+       39.709204,
+       -4.025855
       ],
       [
        39.708895,
