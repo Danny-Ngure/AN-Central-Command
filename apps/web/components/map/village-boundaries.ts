@@ -2103,7 +2103,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "3ed8a3e2-e4a0-409c-a32c-c18f62dbdbca",
-    "name": "BAKARANI KANU",
+    "name": "Bakarani Kanu",
     "section": "Bakarani / Barisheba",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2144,7 +2144,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "f5c78def-1ce1-49a6-86fb-c648e64fb6c0",
-    "name": "BAKARANI PHASE 1",
+    "name": "Bakarani Phase 1",
     "section": "Bakarani / Barisheba",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2185,7 +2185,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "7fa7e0d5-4d7a-4dac-955b-842a46be537f",
-    "name": "BAKARA PHASE 4",
+    "name": "Bakara Phase 4",
     "section": "Bakarani / Barisheba",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2226,7 +2226,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "cae2e4a8-866f-4a5f-9aee-c49e9c4c690a",
-    "name": "BARISHEBA MASHAURI",
+    "name": "Barisheba Mashauri",
     "section": "Bakarani / Barisheba",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2279,7 +2279,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "5adcd0b8-40c3-45b8-9498-4129e98d610f",
-    "name": "BARISHEBA PHASE 2",
+    "name": "Barisheba Phase 2",
     "section": "Bakarani / Barisheba",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2328,7 +2328,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "4840bc85-e977-47e7-aab2-23fef86f6a2d",
-    "name": "BARISHEBA PHASE 5",
+    "name": "Barisheba Phase 5",
     "section": "Bakarani / Barisheba",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2385,7 +2385,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "c7e18456-59b8-42b0-844d-42aafa23e58a",
-    "name": "BOMBOLULU PHASE 2",
+    "name": "Bombolulu Phase 2",
     "section": "Bombolulu / Mlaleo",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2426,7 +2426,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "d2c75f9c-7caa-4f6d-8ebe-5b482f95c40b",
-    "name": "BOMBOLULU SLUM",
+    "name": "Bombolulu Slum",
     "section": "Bombolulu / Mlaleo",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2512,7 +2512,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "6d3f34d3-1c6a-46f1-a09d-75acafd2f439",
-    "name": "MLALEO ASHURA",
+    "name": "Mlaleo Ashura",
     "section": "Bombolulu / Mlaleo",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2610,7 +2610,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "c6fce25a-191f-441a-97a2-0961beefa729",
-    "name": "HADIJA ESTATE",
+    "name": "Hadija Estate",
     "section": "Frere Town core",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2651,7 +2651,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "71e6a5d8-de84-4576-b9b1-c7d39cc04b69",
-    "name": "HAKIKA",
+    "name": "Hakika",
     "section": "Frere Town core",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2692,7 +2692,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "a0991674-3b0b-4999-b88d-8d021f0336a9",
-    "name": "KATISHA",
+    "name": "Katisha",
     "section": "Frere Town core",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2737,7 +2737,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "268e6154-d37b-4dbe-9719-0618649baaee",
-    "name": "MAJENGO MAPYA",
+    "name": "Majengo Mapya",
     "section": "Frere Town core",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2798,7 +2798,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "27c1caaf-20cb-4008-896f-c8e1c52e9be9",
-    "name": "MARHABA",
+    "name": "Marhaba",
     "section": "Frere Town core",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2859,7 +2859,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "9b39a8ff-1e0a-474f-9558-b835c10018d2",
-    "name": "SARAJEVO",
+    "name": "Sarajevo",
     "section": "Frere Town core",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2916,7 +2916,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "54ae323a-656d-470e-a106-74ee154f1836",
-    "name": "SHELEMBA",
+    "name": "Shelemba",
     "section": "Frere Town core",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2957,7 +2957,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "f37b4cd7-15aa-4a0e-b925-29b0e7b6dbf5",
-    "name": "MATOPENI MBUNGONI",
+    "name": "Matopeni Mbungoni",
     "section": "Mbungoni / Mgongeni",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -2998,7 +2998,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "08eff72e-5082-47fb-99be-a0a1de8b0f52",
-    "name": "MBUNGONI PHASE 1",
+    "name": "Mbungoni Phase 1",
     "section": "Mbungoni / Mgongeni",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -3043,7 +3043,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "eea3f6a9-b0a3-4365-bd7c-e0d356bb07d3",
-    "name": "MBUNGONI PHASE 2",
+    "name": "Mbungoni Phase 2",
     "section": "Mbungoni / Mgongeni",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -3084,7 +3084,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "3a6c8d92-26b5-4f96-a2cb-ccc5e5c1a153",
-    "name": "MGINGENI PHASE 1",
+    "name": "Mgingeni Phase 1",
     "section": "Mbungoni / Mgongeni",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -3133,7 +3133,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "52ed78a9-5d25-420c-98f0-87c1db4c24bd",
-    "name": "MGONGENI PHASE 2",
+    "name": "Mgongeni Phase 2",
     "section": "Mbungoni / Mgongeni",
     "wardId": "22222222-0000-4000-8000-000000000004",
     "wardName": "Frere Town"
@@ -3428,14 +3428,6 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
     "coordinates": [
      [
       [
-       39.700093,
-       -4.026268
-      ],
-      [
-       39.701073,
-       -4.024727
-      ],
-      [
        39.700793,
        -4.023558
       ],
@@ -3444,20 +3436,20 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.02353
       ],
       [
-       39.698826,
-       -4.023504
+       39.698565,
+       -4.023499
       ],
       [
-       39.696804,
-       -4.025711
+       39.695395,
+       -4.026959
       ],
       [
-       39.696952,
-       -4.026544
+       39.701481,
+       -4.026425
       ],
       [
-       39.700093,
-       -4.026268
+       39.700793,
+       -4.023558
       ]
      ]
     ]
@@ -3466,8 +3458,8 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
   {
    "type": "Feature",
    "properties": {
-    "villageId": "eb3a6891-a367-479d-ba10-4eeade17db7e",
-    "name": "IDD KUMBI",
+    "villageId": "02843975-cf87-4827-991d-1adb3cda5cf2",
+    "name": "Kambi ya Moto",
     "section": "Kidogo Basi / Kambi ya Moto",
     "wardId": "22222222-0000-4000-8000-000000000005",
     "wardName": "Ziwa La Ng'ombe"
@@ -3477,8 +3469,8 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
     "coordinates": [
      [
       [
-       39.698826,
-       -4.023504
+       39.698565,
+       -4.023499
       ],
       [
        39.698083,
@@ -3495,161 +3487,6 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
       [
        39.695916,
        -4.02357
-      ],
-      [
-       39.695131,
-       -4.023698
-      ],
-      [
-       39.696804,
-       -4.025711
-      ],
-      [
-       39.698826,
-       -4.023504
-      ]
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "villageId": "02843975-cf87-4827-991d-1adb3cda5cf2",
-    "name": "KAMBI YA MOTO",
-    "section": "Kidogo Basi / Kambi ya Moto",
-    "wardId": "22222222-0000-4000-8000-000000000005",
-    "wardName": "Ziwa La Ng'ombe"
-   },
-   "geometry": {
-    "type": "Polygon",
-    "coordinates": [
-     [
-      [
-       39.700093,
-       -4.026268
-      ],
-      [
-       39.696952,
-       -4.026544
-      ],
-      [
-       39.693127,
-       -4.034094
-      ],
-      [
-       39.693596,
-       -4.034303
-      ],
-      [
-       39.695309,
-       -4.034702
-      ],
-      [
-       39.696052,
-       -4.03476
-      ],
-      [
-       39.696223,
-       -4.034188
-      ],
-      [
-       39.696452,
-       -4.033675
-      ],
-      [
-       39.697822,
-       -4.034531
-      ],
-      [
-       39.698165,
-       -4.035331
-      ],
-      [
-       39.700678,
-       -4.041669
-      ],
-      [
-       39.701831,
-       -4.040957
-      ],
-      [
-       39.700093,
-       -4.026268
-      ]
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "villageId": "0b98a119-1caf-4edc-a5ab-830cafe9ccde",
-    "name": "Kidogo Basi",
-    "section": "Kidogo Basi / Kambi ya Moto",
-    "wardId": "22222222-0000-4000-8000-000000000005",
-    "wardName": "Ziwa La Ng'ombe"
-   },
-   "geometry": {
-    "type": "Polygon",
-    "coordinates": [
-     [
-      [
-       39.704749,
-       -4.027447
-      ],
-      [
-       39.706692,
-       -4.024534
-      ],
-      [
-       39.706584,
-       -4.023583
-      ],
-      [
-       39.704851,
-       -4.023583
-      ],
-      [
-       39.704661,
-       -4.023598
-      ],
-      [
-       39.703798,
-       -4.02622
-      ],
-      [
-       39.704749,
-       -4.027447
-      ]
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "villageId": "5570389a-bee4-4728-b32b-152635c5a4dc",
-    "name": "KIDOGOBASI",
-    "section": "Kidogo Basi / Kambi ya Moto",
-    "wardId": "22222222-0000-4000-8000-000000000005",
-    "wardName": "Ziwa La Ng'ombe"
-   },
-   "geometry": {
-    "type": "Polygon",
-    "coordinates": [
-     [
-      [
-       39.696952,
-       -4.026544
-      ],
-      [
-       39.696804,
-       -4.025711
-      ],
-      [
-       39.695131,
-       -4.023698
       ],
       [
        39.694846,
@@ -3690,6 +3527,51 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
       [
        39.689308,
        -4.029109
+      ],
+      [
+       39.688637,
+       -4.029751
+      ],
+      [
+       39.695395,
+       -4.026959
+      ],
+      [
+       39.698565,
+       -4.023499
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "villageId": "0b98a119-1caf-4edc-a5ab-830cafe9ccde",
+    "name": "Kidogo Basi",
+    "section": "Kidogo Basi / Kambi ya Moto",
+    "wardId": "22222222-0000-4000-8000-000000000005",
+    "wardName": "Ziwa La Ng'ombe"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       39.703471,
+       -4.028701
+      ],
+      [
+       39.701481,
+       -4.026425
+      ],
+      [
+       39.695395,
+       -4.026959
+      ],
+      [
+       39.688637,
+       -4.029751
       ],
       [
        39.688309,
@@ -3736,49 +3618,36 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.033846
       ],
       [
-       39.693127,
-       -4.034094
+       39.693596,
+       -4.034303
       ],
       [
-       39.696952,
-       -4.026544
-      ]
-     ]
-    ]
-   }
-  },
-  {
-   "type": "Feature",
-   "properties": {
-    "villageId": "5a946e52-7b2a-428b-9926-70ae4ac6e64c",
-    "name": "MKUNGUNI",
-    "section": "Kidogo Basi / Kambi ya Moto",
-    "wardId": "22222222-0000-4000-8000-000000000005",
-    "wardName": "Ziwa La Ng'ombe"
-   },
-   "geometry": {
-    "type": "Polygon",
-    "coordinates": [
-     [
-      [
-       39.704749,
-       -4.027447
+       39.695309,
+       -4.034702
       ],
       [
-       39.703798,
-       -4.02622
+       39.696052,
+       -4.03476
       ],
       [
-       39.701073,
-       -4.024727
+       39.696223,
+       -4.034188
       ],
       [
-       39.700093,
-       -4.026268
+       39.696452,
+       -4.033675
       ],
       [
-       39.701831,
-       -4.040957
+       39.697822,
+       -4.034531
+      ],
+      [
+       39.698165,
+       -4.035331
+      ],
+      [
+       39.700678,
+       -4.041669
       ],
       [
        39.702619,
@@ -3801,12 +3670,57 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.036758
       ],
       [
-       39.706767,
-       -4.034958
+       39.705647,
+       -4.036452
       ],
       [
-       39.704749,
-       -4.027447
+       39.703471,
+       -4.028701
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "villageId": "5a946e52-7b2a-428b-9926-70ae4ac6e64c",
+    "name": "Mkunguni",
+    "section": "Kidogo Basi / Kambi ya Moto",
+    "wardId": "22222222-0000-4000-8000-000000000005",
+    "wardName": "Ziwa La Ng'ombe"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       39.706766,
+       -4.023583
+      ],
+      [
+       39.706763,
+       -4.023583
+      ],
+      [
+       39.704851,
+       -4.023583
+      ],
+      [
+       39.704633,
+       -4.023601
+      ],
+      [
+       39.704006,
+       -4.027646
+      ],
+      [
+       39.706781,
+       -4.024578
+      ],
+      [
+       39.706766,
+       -4.023583
       ]
      ]
     ]
@@ -3939,7 +3853,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "6ca78a35-52a0-4f08-a33a-93c19602e845",
-    "name": "KENOL",
+    "name": "Kenol",
     "section": "Shanzu / north",
     "wardId": "22222222-0000-4000-8000-000000000005",
     "wardName": "Ziwa La Ng'ombe"
@@ -3980,7 +3894,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "8b5ae8a8-acf0-4b24-8737-2f61f68e2356",
-    "name": "KHADIJA",
+    "name": "Khadija",
     "section": "Shanzu / north",
     "wardId": "22222222-0000-4000-8000-000000000005",
     "wardName": "Ziwa La Ng'ombe"
@@ -4606,7 +4520,7 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
    "type": "Feature",
    "properties": {
     "villageId": "637d2895-4b0a-4942-8891-d5e78b2b31a5",
-    "name": "KISIMANI",
+    "name": "Kisimani",
     "section": "Ziwa core",
     "wardId": "22222222-0000-4000-8000-000000000005",
     "wardName": "Ziwa La Ng'ombe"
@@ -4665,16 +4579,12 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.02353
       ],
       [
-       39.706763,
+       39.706766,
        -4.023583
       ],
       [
-       39.706584,
-       -4.023583
-      ],
-      [
-       39.706692,
-       -4.024534
+       39.706781,
+       -4.024578
       ],
       [
        39.70781,
@@ -4714,16 +4624,20 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.025092
       ],
       [
-       39.706692,
-       -4.024534
+       39.706781,
+       -4.024578
       ],
       [
-       39.704749,
-       -4.027447
+       39.704006,
+       -4.027646
       ],
       [
-       39.706767,
-       -4.034958
+       39.703471,
+       -4.028701
+      ],
+      [
+       39.705647,
+       -4.036452
       ],
       [
        39.706788,
@@ -4804,8 +4718,12 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
     "coordinates": [
      [
       [
-       39.704661,
-       -4.023598
+       39.704006,
+       -4.027646
+      ],
+      [
+       39.704633,
+       -4.023601
       ],
       [
        39.703834,
@@ -4820,16 +4738,16 @@ export const VILLAGE_BOUNDARIES: GeoJSON.FeatureCollection<GeoJSON.Polygon, Vill
        -4.023558
       ],
       [
-       39.701073,
-       -4.024727
+       39.701481,
+       -4.026425
       ],
       [
-       39.703798,
-       -4.02622
+       39.703471,
+       -4.028701
       ],
       [
-       39.704661,
-       -4.023598
+       39.704006,
+       -4.027646
       ]
      ]
     ]

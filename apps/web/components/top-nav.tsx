@@ -279,7 +279,7 @@ export function TopNav({ user, wards, villages = [] }: Props) {
                           <Link
                             key={v.id}
                             href={`/wards/${ward.id}/villages/${v.id}`}
-                            className="px-2 py-1 rounded text-[12px] text-brand-textMuted hover:text-brand-textActive hover:bg-brand-burnt/15 transition truncate"
+                            className="px-2 py-1 rounded text-[12px] text-brand-textBody hover:text-brand-burnt hover:bg-brand-burnt/15 transition truncate"
                           >
                             {v.name}
                           </Link>
