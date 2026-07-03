@@ -50,6 +50,19 @@ function coverageColor(pct: number | null | undefined): string {
   return '#22C55E';
 }
 
+// One distinct, professional colour per ward (matches the all-villages map).
+const WARD_COLORS: Record<string, string> = {
+  Kadzandani: '#E8883A',
+  'Frere Town': '#3B82F6',
+  "Ziwa La Ng'ombe": '#14B8A6',
+  Kongowea: '#22C55E',
+  Mkomani: '#EC4899',
+};
+const WARD_ORDER = ['Frere Town', 'Kongowea', 'Mkomani', "Ziwa La Ng'ombe", 'Kadzandani'];
+function wardColor(name: string): string {
+  return WARD_COLORS[name] ?? '#64748B';
+}
+
 type FeatureWithData = GeoJSON.Feature<
   GeoJSON.Polygon,
   WardPolygonProps & { coverage: number; topIssue: string; registeredVoters: number }
@@ -146,12 +159,16 @@ export function ConstituencyMap({ wards, stations }: ConstituencyMapProps) {
             source: 'wards',
             paint: {
               'fill-color': [
-                'case',
-                ['<', ['get', 'coverage'], 60], '#FF3E3E',
-                ['<', ['get', 'coverage'], 75], '#FF9F1C',
-                '#22C55E',
+                'match',
+                ['get', 'name'],
+                'Kadzandani', '#E8883A',
+                'Frere Town', '#3B82F6',
+                "Ziwa La Ng'ombe", '#14B8A6',
+                'Kongowea', '#22C55E',
+                'Mkomani', '#EC4899',
+                '#64748B',
               ],
-              'fill-opacity': 0.5,
+              'fill-opacity': 0.6,
             },
           });
 
@@ -234,7 +251,6 @@ export function ConstituencyMap({ wards, stations }: ConstituencyMapProps) {
         setSelectedWardId={setSelectedWardId}
         selectedFeature={selectedFeature}
         selectedStations={selectedStations}
-        reason={error}
       />
     );
   }
@@ -246,11 +262,11 @@ export function ConstituencyMap({ wards, stations }: ConstituencyMapProps) {
           Nyali Constituency
         </h2>
         <span className="text-[10px] text-brand-textMuted">
-          Mapbox GL JS · boundaries © IEBC
+          boundaries © IEBC
         </span>
       </div>
       <div ref={containerRef} className="h-[540px] w-full" />
-      <Legend />
+      <WardLegend />
       {selectedFeature && (
         <SidePanel
           feature={selectedFeature}
@@ -335,24 +351,18 @@ function KpiRow({ label, value, tone }: { label: string; value: string; tone?: '
 // Legend
 // ============================================================================
 
-function Legend() {
+function WardLegend() {
   return (
     <div className="absolute bottom-3 left-3 bg-brand-cardBg/90 backdrop-blur-sm border border-brand-border rounded-lg p-3 text-[10px] space-y-1.5 z-10 pointer-events-none">
       <div className="font-semibold text-brand-textMuted uppercase tracking-wider mb-1">
-        Village coverage
+        Wards
       </div>
-      <div className="flex items-center gap-2">
-        <span className="w-3 h-3 rounded-sm" style={{ background: '#FF3E3E' }} />
-        <span className="text-brand-textMuted">Below 60%</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="w-3 h-3 rounded-sm" style={{ background: '#FF9F1C' }} />
-        <span className="text-brand-textMuted">60–75%</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="w-3 h-3 rounded-sm" style={{ background: '#22C55E' }} />
-        <span className="text-brand-textMuted">75% or more</span>
-      </div>
+      {WARD_ORDER.map((w) => (
+        <div key={w} className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-sm" style={{ background: wardColor(w) }} />
+          <span className="text-brand-textMuted">{w}</span>
+        </div>
+      ))}
       <div className="border-t border-brand-border/60 pt-1.5 mt-1.5 flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-brand-cyan" />
         <span className="text-brand-textMuted">Polling station</span>
@@ -372,7 +382,6 @@ interface FallbackProps {
   setSelectedWardId: (id: string | null) => void;
   selectedFeature: FeatureWithData | null;
   selectedStations: MapPollingStation[];
-  reason: string | null;
 }
 
 function SvgFallback({
@@ -382,20 +391,27 @@ function SvgFallback({
   setSelectedWardId,
   selectedFeature,
   selectedStations,
-  reason,
 }: FallbackProps) {
-  const allLngs = featuresWithData.flatMap((f) => f.geometry.coordinates[0].map(([lng]) => lng)).concat(stations.map((s) => s.lng));
-  const allLats = featuresWithData.flatMap((f) => f.geometry.coordinates[0].map(([, lat]) => lat)).concat(stations.map((s) => s.lat));
-  const minLng = Math.min(...allLngs) - 0.002;
-  const maxLng = Math.max(...allLngs) + 0.002;
-  const minLat = Math.min(...allLats) - 0.002;
-  const maxLat = Math.max(...allLats) + 0.002;
+  // Frame to the WARD polygons only (not stations) so the constituency fills the
+  // view; stray-coordinate stations no longer shrink the map into a tiny blob.
+  const wardLngs = featuresWithData.flatMap((f) => f.geometry.coordinates[0].map(([lng]) => lng));
+  const wardLats = featuresWithData.flatMap((f) => f.geometry.coordinates[0].map(([, lat]) => lat));
+  const padLng = (Math.max(...wardLngs) - Math.min(...wardLngs)) * 0.04;
+  const padLat = (Math.max(...wardLats) - Math.min(...wardLats)) * 0.04;
+  const minLng = Math.min(...wardLngs) - padLng;
+  const maxLng = Math.max(...wardLngs) + padLng;
+  const minLat = Math.min(...wardLats) - padLat;
+  const maxLat = Math.max(...wardLats) + padLat;
   const W = 900;
   const H = 540;
   const proj = (lng: number, lat: number): [number, number] => [
     ((lng - minLng) / (maxLng - minLng)) * W,
     ((maxLat - lat) / (maxLat - minLat)) * H,
   ];
+  // Only draw stations that actually fall inside the constituency frame.
+  const framedStations = stations.filter(
+    (s) => s.lng >= minLng && s.lng <= maxLng && s.lat >= minLat && s.lat <= maxLat,
+  );
 
   return (
     <div className="rounded-xl border border-brand-border bg-brand-cardBg overflow-hidden relative">
@@ -403,8 +419,8 @@ function SvgFallback({
         <h2 className="text-xs font-semibold text-brand-textMuted uppercase tracking-wider">
           Nyali Constituency
         </h2>
-        <span className="text-[10px] text-brand-warning">
-          Vector fallback · boundaries © IEBC · {reason ?? 'WebGL unavailable'}
+        <span className="text-[10px] text-brand-textMuted">
+          boundaries © IEBC
         </span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[540px]" onClick={() => setSelectedWardId(null)}>
@@ -421,24 +437,24 @@ function SvgFallback({
           const path = 'M ' + points.map(([x, y]) => `${x},${y}`).join(' L ') + ' Z';
           const centroidLngLat = polygonCentroid(f.geometry.coordinates[0]);
           const [cx, cy] = proj(centroidLngLat[0], centroidLngLat[1]);
-          const fill = coverageColor(f.properties.coverage);
+          const fill = wardColor(f.properties.name);
           const isSelected = selectedWardId === f.properties.wardId;
           return (
             <g key={f.properties.wardId}>
               <path
                 d={path}
                 fill={fill}
-                fillOpacity={isSelected ? 0.7 : 0.5}
+                fillOpacity={isSelected ? 0.92 : 0.72}
                 stroke="#fff"
-                strokeOpacity={0.6}
-                strokeWidth={isSelected ? 3 : 2}
+                strokeOpacity={0.85}
+                strokeWidth={isSelected ? 3 : 1.5}
                 style={{ cursor: 'pointer' }}
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedWardId(f.properties.wardId);
                 }}
               >
-                <title>{f.properties.name} — {f.properties.coverage}% coverage</title>
+                <title>{f.properties.name} — {f.properties.registeredVoters.toLocaleString()} voters</title>
               </path>
               <text
                 x={cx}
@@ -458,7 +474,7 @@ function SvgFallback({
           );
         })}
 
-        {stations.map((s) => {
+        {framedStations.map((s) => {
           const [x, y] = proj(s.lng, s.lat);
           return (
             <circle
@@ -467,15 +483,15 @@ function SvgFallback({
               cy={y}
               r="4"
               fill="#00E5FF"
-              stroke="rgba(0,0,0,0.5)"
-              strokeWidth="0.5"
+              stroke="rgba(0,0,0,0.6)"
+              strokeWidth="1"
             >
               <title>{s.name}</title>
             </circle>
           );
         })}
       </svg>
-      <Legend />
+      <WardLegend />
       {selectedFeature && (
         <SidePanel
           feature={selectedFeature}

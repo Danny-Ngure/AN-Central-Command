@@ -8,8 +8,9 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { PhoneActions } from '@/components/phone-actions';
 import { Pie } from '@/components/charts/pie';
 import { BarChart } from '@/components/charts/bar-chart';
+import { streamsForStation } from '@/data/nyali-polling-streams';
 
-// /polling-stations/[id]?tab=voters|demographics|turnout
+// /polling-stations/[id]?tab=voters|streams|demographics|turnout
 //
 // Tabs (default = voters, addressing the user's clear ask: clicking "View voters"
 // should show the voter list FIRST, not the history):
@@ -20,7 +21,7 @@ import { BarChart } from '@/components/charts/bar-chart';
 // Server-rendered — tabs are plain Link navigation, works without JS.
 
 const PAGE_SIZE = 50;
-type Tab = 'voters' | 'demographics' | 'turnout';
+type Tab = 'voters' | 'streams' | 'demographics' | 'turnout';
 
 interface PageProps {
   params: { id: string };
@@ -35,7 +36,7 @@ interface PageProps {
 export default async function PollingStationPage({ params, searchParams }: PageProps) {
   const claims = await getServerAuthOrRedirect();
   const stationId = params.id;
-  const tab: Tab = (['voters', 'demographics', 'turnout'].includes(searchParams.tab ?? '')
+  const tab: Tab = (['voters', 'streams', 'demographics', 'turnout'].includes(searchParams.tab ?? '')
     ? searchParams.tab
     : 'voters') as Tab;
   const page = Math.max(1, Number(searchParams.page ?? 1) || 1);
@@ -191,6 +192,11 @@ export default async function PollingStationPage({ params, searchParams }: PageP
   const phonePct = demo.total > 0 ? (demo.withPhone / demo.total) * 100 : 0;
   const basePath = `/polling-stations/${stationId}`;
 
+  // Polling STREAMS for this centre (IEBC 2022). Matched by normalised name.
+  const stationStreams = streamsForStation(station.name);
+  const streamCount = stationStreams?.streams.length ?? 0;
+  const streamRegistered = stationStreams?.streams.reduce((a, b) => a + b, 0) ?? 0;
+
   return (
     <div className="space-y-6 max-w-7xl">
       <Breadcrumbs
@@ -224,6 +230,13 @@ export default async function PollingStationPage({ params, searchParams }: PageP
             <> · 2022 turnout {station.turnout2022}%</>
           )}
         </p>
+        {stationStreams && (
+          <p className="text-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-tealBlue/10 border border-brand-tealBlue/30 px-2.5 py-1 text-xs font-semibold text-brand-tealBlue">
+              🗳️ {streamCount} polling stream{streamCount === 1 ? '' : 's'} · {streamRegistered.toLocaleString()} registered (IEBC 2022)
+            </span>
+          </p>
+        )}
       </header>
 
       {/* ─── Person in charge — ward coordinator + assistants ──────────── */}
@@ -281,6 +294,11 @@ export default async function PollingStationPage({ params, searchParams }: PageP
         <TabLink href={basePath} active={tab === 'voters'}>
           Voters {demo.total > 0 && <span className="ml-1 text-[10px] opacity-75">({demo.total.toLocaleString()})</span>}
         </TabLink>
+        {stationStreams && (
+          <TabLink href={`${basePath}?tab=streams`} active={tab === 'streams'}>
+            Streams <span className="ml-1 text-[10px] opacity-75">({streamCount})</span>
+          </TabLink>
+        )}
         <TabLink href={`${basePath}?tab=demographics`} active={tab === 'demographics'}>
           Demographics
         </TabLink>
@@ -394,6 +412,83 @@ export default async function PollingStationPage({ params, searchParams }: PageP
       )}
 
       {/* ─── TAB: Demographics ─────────────────────────────────────────── */}
+      {/* ─── TAB: Streams ──────────────────────────────────────────────── */}
+      {tab === 'streams' && stationStreams && (
+        <section className="space-y-4 max-w-3xl">
+          {/* summary strip */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-brand-border bg-brand-cardBg p-4">
+              <div className="text-[10px] uppercase tracking-wider text-brand-textMuted font-semibold">Polling streams</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums text-brand-tealBlue">{streamCount}</div>
+            </div>
+            <div className="rounded-xl border border-brand-border bg-brand-cardBg p-4">
+              <div className="text-[10px] uppercase tracking-wider text-brand-textMuted font-semibold">Registered (IEBC 2022)</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums text-brand-textActive">{streamRegistered.toLocaleString()}</div>
+            </div>
+            <div className="rounded-xl border border-brand-border bg-brand-cardBg p-4">
+              <div className="text-[10px] uppercase tracking-wider text-brand-textMuted font-semibold">Avg / stream</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums text-brand-orangeBright">
+                {Math.round(streamRegistered / streamCount).toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          {/* stream list */}
+          <div className="rounded-xl border border-brand-border bg-brand-cardBg overflow-hidden">
+            <div className="px-4 py-3 border-b border-brand-border">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-brand-textMuted">
+                {station.name} · streams
+              </h2>
+            </div>
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-brand-textMuted">
+                  <th className="text-left font-semibold px-4 py-2 border-b border-brand-border">Stream</th>
+                  <th className="text-right font-semibold px-4 py-2 border-b border-brand-border">Registered voters</th>
+                  <th className="text-left font-semibold px-4 py-2 border-b border-brand-border w-1/2">Share of centre</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stationStreams.streams.map((v, i) => {
+                  const pct = streamRegistered > 0 ? (v / streamRegistered) * 100 : 0;
+                  return (
+                    <tr key={i} className="hover:bg-black/5">
+                      <td className="px-4 py-2.5 border-b border-brand-border/60 font-semibold text-brand-textActive whitespace-nowrap">
+                        Stream {String(i + 1).padStart(3, '0')}
+                      </td>
+                      <td className="px-4 py-2.5 border-b border-brand-border/60 text-right tabular-nums text-brand-textActive">
+                        {v.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2.5 border-b border-brand-border/60">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 flex-1 rounded-full bg-black/10 overflow-hidden">
+                            <div className="h-full bg-brand-tealBlue" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[11px] text-brand-textMuted tabular-nums w-10 text-right">{pct.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-brand-cardBgHeavy/40">
+                  <td className="px-4 py-2.5 font-bold text-brand-textActive">Total · {streamCount} streams</td>
+                  <td className="px-4 py-2.5 text-right font-bold tabular-nums text-brand-textActive">{streamRegistered.toLocaleString()}</td>
+                  <td className="px-4 py-2.5"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <p className="text-[11px] text-brand-textMuted italic">
+            Streams are the individual desks this centre runs on election day. Figures from the IEBC 2022 Register of
+            Voters (per-station); official per-stream KIEMS codes to be confirmed with IEBC. The Voters tab lists the
+            actual registered voters linked to this centre.
+          </p>
+        </section>
+      )}
+
       {tab === 'demographics' && demo.total > 0 && (
         <section className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

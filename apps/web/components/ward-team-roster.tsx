@@ -49,12 +49,13 @@ export function WardTeamRoster({ ward, members }: { ward: string; members: WardT
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-3 flex-wrap text-[11px] text-brand-textMuted">
-        <span className="rounded-full bg-brand-burnt/15 border border-brand-burnt/40 px-2.5 py-0.5 font-bold uppercase tracking-wider text-brand-burnt">
-          {members.length} team members
+      <div className="flex items-center gap-4 flex-wrap">
+        <span className="inline-flex items-baseline gap-2 rounded-xl bg-brand-burnt/10 border-2 border-brand-burnt/40 px-3.5 py-2">
+          <span className="text-3xl font-extrabold text-brand-burnt tabular-nums leading-none">{members.length}</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-brand-burnt">team members</span>
         </span>
-        <span>
-          <span className="font-bold text-brand-gold">{matched}</span> matched to a polling station from the IEBC register
+        <span className="text-xs text-brand-textMuted">
+          <span className="text-xl font-extrabold text-brand-gold tabular-nums">{matched}</span> matched to a polling station from the IEBC register
         </span>
       </div>
 

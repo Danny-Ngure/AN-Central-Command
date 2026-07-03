@@ -13,6 +13,8 @@ import {
 } from '@an/db';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
 import { withRlsTx } from '@/lib/api';
+import { churchesForWard } from '@/data/nyali-churches';
+import { extraMembersForWard } from '@/data/nyali-team-members';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Pie } from '@/components/charts/pie';
 import { HorizontalBarChart } from '@/components/charts/horizontal-bar';
@@ -198,7 +200,15 @@ export default async function WardDetail({ params, searchParams }: PageProps) {
 
   if (!data) notFound();
 
-  const { ward, demo, stationVoterCounts, stations, sites, leaders, villageRows, wardTeam, wardMembers, siblingWards, wardRoads } = data;
+  const { ward, demo, stationVoterCounts, stations, sites: sitesDb, leaders, villageRows, wardTeam, wardMembers: wardMembersDb, siblingWards, wardRoads } = data;
+
+  // Merge in the IEBC-register churches for this ward (read-only reference rows) so
+  // they show under Religious & Social Sites without a DB seed. Persist later via
+  // tools/seed-nyali-churches.cjs.
+  const sites = [...sitesDb, ...churchesForWard(ward.id)];
+
+  // Merge in extra ward team members added by request (not yet seeded to the DB).
+  const wardMembers = [...wardMembersDb, ...extraMembersForWard(ward.id)];
   const mpRoadCount = wardRoads.filter((r) => r.mpProject).length;
   const wardCoordinator = wardTeam.find((t) => t.role === 'ward_coordinator') ?? null;
   const wardAssistants = wardTeam.filter((t) => t.role === 'assistant_ward_coordinator');
@@ -1223,6 +1233,32 @@ function DonutCard({ title, children }: { title: string; children: React.ReactNo
 }
 
 function SiteCard({ site }: { site: any }) {
+  // Read-only reference sites (e.g. IEBC-register churches) — show identity + reach,
+  // no visit toggle/log (those need a real DB row).
+  if (site.readOnly) {
+    return (
+      <div className="rounded-lg border border-brand-tealBlue/40 bg-brand-cardBg p-3">
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-brand-textActive">{site.name}</div>
+            {site.areaName && (
+              <div className="text-[10px] text-brand-textMuted/80 truncate">📍 {site.areaName}</div>
+            )}
+            {site.estimatedSize ? (
+              <div className="text-[11px] font-semibold text-brand-tealBlue mt-0.5">
+                🧮 {Number(site.estimatedSize).toLocaleString()} registered (2025)
+              </div>
+            ) : null}
+          </div>
+          <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider text-brand-tealBlue bg-brand-tealBlue/10 border border-brand-tealBlue/30 rounded-full px-2 py-0.5">
+            IEBC
+          </span>
+          {site.contactPhone && <PhoneActions phone={site.contactPhone} size="sm" />}
+        </div>
+      </div>
+    );
+  }
+
   const visited = !!site.visited;
   const visitedAt = site.visitedAt ? new Date(site.visitedAt) : null;
   const plannedAt = site.plannedVisitAt ? new Date(site.plannedVisitAt) : null;

@@ -20,6 +20,15 @@ const PRIVILEGED_ROLES = new Set([
   'tech_lead',
 ]);
 
+// Super Admins get in regardless of job role (e.g. Irene is Head of Media but a
+// Super Admin with full access). Identity-stable by name.
+const SUPER_ADMIN_NAMES = new Set([
+  'Alfayo Nelson',
+  'Benson Imoli',
+  'Dan Ngure',
+  'Irene Mkamburi',
+]);
+
 export default async function DataImportPage() {
   const claims = await getServerAuthOrRedirect();
 
@@ -30,7 +39,8 @@ export default async function DataImportPage() {
     .limit(1);
 
   const person = personRows[0];
-  if (!person || !PRIVILEGED_ROLES.has(person.role)) {
+  const allowed = person && (PRIVILEGED_ROLES.has(person.role) || SUPER_ADMIN_NAMES.has(person.fullName));
+  if (!allowed) {
     redirect('/dashboard?reason=insufficient_role');
   }
 

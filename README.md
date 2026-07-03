@@ -55,7 +55,7 @@ pnpm db:migrate
 pnpm db:seed
 
 # 4. Run everything in dev mode
-pnpm dev
+pnpm devpnpm --filter @an/db db:apply-extras
 ```
 
 ## Expose local web dev via ngrok

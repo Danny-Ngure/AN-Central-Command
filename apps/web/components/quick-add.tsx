@@ -134,7 +134,7 @@ export function QuickAdd({ wards }: { wards: Ward[] }) {
         type="button"
         onClick={() => setOpen(true)}
         title="Quick add an activity"
-        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-brand-burnt px-5 py-3 text-sm font-bold text-white shadow-xl hover:bg-brand-rust transition"
+        className="fixed bottom-24 md:bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-brand-burnt px-5 py-3 text-sm font-bold text-white shadow-xl hover:bg-brand-rust transition"
       >
         <span className="text-lg leading-none">＋</span>
         <span className="hidden sm:inline">Quick Add</span>

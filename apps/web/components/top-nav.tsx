@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { BrandMark } from './brand';
+import { CommandSearch } from './command-search';
 import { LogoutButton } from './logout-button';
 import { ThemeToggle } from './theme-toggle';
 
@@ -28,6 +29,15 @@ const PRIVILEGED_ROLES = new Set([
   'chief_strategist',
   'constituency_coordinator',
   'tech_lead',
+]);
+
+// The four Super Admins have full access to everything regardless of their job
+// role (e.g. Irene is Head of Media but a Super Admin). Identity-stable by name.
+const SUPER_ADMIN_NAMES = new Set([
+  'Alfayo Nelson',
+  'Benson Imoli',
+  'Dan Ngure',
+  'Irene Mkamburi',
 ]);
 
 interface Ward {
@@ -74,6 +84,7 @@ const ANALYSIS_LINKS: SubLink[] = [
 ];
 
 const TEAM_LINKS: SubLink[] = [
+  { href: '/team?group=members', label: 'Members list' },
   { href: '/team?group=executive', label: 'Executive' },
   { href: '/team?group=wards', label: 'All Wards' },
   { href: '/team?group=warembo', label: 'Warembo' },
@@ -104,7 +115,7 @@ interface Props {
 
 export function TopNav({ user, wards, villages = [] }: Props) {
   const pathname = usePathname() ?? '';
-  const privileged = PRIVILEGED_ROLES.has(user.role);
+  const privileged = PRIVILEGED_ROLES.has(user.role) || SUPER_ADMIN_NAMES.has(user.fullName);
 
   const [openMenu, setOpenMenu] = useState<string | null>(null); // desktop dropdown
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -172,8 +183,12 @@ export function TopNav({ user, wards, villages = [] }: Props) {
         : 'text-brand-textBody hover:text-brand-textActive hover:bg-black/5',
     ].join(' ');
 
-  // Polling Stations is now a top-level dropdown, organised by ward.
-  const stationLinks: SubLink[] = wards.map((w) => ({ href: `/wards/${w.id}?tab=stations`, label: w.name }));
+  // Polling Stations is now a top-level dropdown: an all-centres index first,
+  // then organised by ward.
+  const stationLinks: SubLink[] = [
+    { href: '/polling-stations', label: '🗳️ All polling centres' },
+    ...wards.map((w) => ({ href: `/wards/${w.id}?tab=stations`, label: w.name })),
+  ];
 
   // Villages clustered by ward — for the Villages mega-menu.
   const villagesByWard = wards.map((w) => ({
@@ -280,6 +295,15 @@ export function TopNav({ user, wards, villages = [] }: Props) {
                     <span className="text-[11px] text-brand-textMuted">{vs.length} villages</span>
                   </Link>
                 ))}
+                {/* Nyali — the whole constituency (all wards joined). Sits below the
+                    ward list as an aggregate entry → constituency-wide map. */}
+                <Link
+                  href="/villages"
+                  className="mt-1 flex items-center justify-between px-3 py-2 rounded-lg text-sm bg-brand-teal/10 border border-brand-teal/40 text-brand-teal hover:bg-brand-teal/20 transition"
+                >
+                  <span className="font-bold">🏛️ Nyali · whole constituency</span>
+                  <span className="text-[11px] font-semibold">{villages.length} villages</span>
+                </Link>
               </div>
             )}
           </div>
@@ -340,10 +364,23 @@ export function TopNav({ user, wards, villages = [] }: Props) {
           )}
         </nav>
 
+        {/* Global search — subtle, always reachable (also ⌘K / "/") */}
+        <div className="ml-auto shrink-0">
+          <CommandSearch />
+        </div>
+
+        {/* Add CTA — the layman "+ Add" hub (church / mosque / polling / team) */}
+        <Link
+          href="/add"
+          className="hidden md:inline-flex items-center gap-1.5 shrink-0 ml-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-brand-teal text-white hover:bg-brand-burnt transition"
+        >
+          <PlusIcon /> Add
+        </Link>
+
         {/* Schedule CTA — opens the Plan-my-month itinerary builder */}
         <Link
           href="/meetings?action=plan"
-          className="hidden md:inline-flex items-center gap-1.5 shrink-0 ml-auto px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-brand-rust text-white hover:bg-brand-burnt transition"
+          className="hidden md:inline-flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-brand-rust text-white hover:bg-brand-burnt transition"
         >
           <PlusIcon /> Schedule
         </Link>
@@ -360,6 +397,13 @@ export function TopNav({ user, wards, villages = [] }: Props) {
               {user.wardName && <span> · {user.wardName}</span>}
             </div>
           </div>
+          <Link
+            href="/account/password"
+            title="Change password"
+            className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-lg border border-brand-border text-brand-textMuted hover:text-brand-burnt hover:border-brand-burnt transition"
+          >
+            🔑
+          </Link>
           <LogoutButton />
         </div>
 
@@ -445,6 +489,13 @@ export function TopNav({ user, wards, villages = [] }: Props) {
                     onNav={() => setMobileOpen(false)}
                   />
                 ))}
+                {/* Nyali — whole constituency (all wards joined) */}
+                <MobileLink
+                  href="/villages"
+                  label={`🏛️ Nyali · whole constituency — ${villages.length} villages`}
+                  sub
+                  onNav={() => setMobileOpen(false)}
+                />
               </MobileSection>
 
               <MobileLink href="/voters" label="Voters" active={activeGroup === 'voters'} onNav={() => setMobileOpen(false)} />
@@ -520,6 +571,13 @@ export function TopNav({ user, wards, villages = [] }: Props) {
                 {ROLE_LABEL[user.role] ?? user.role}
                 {user.wardName && <span> · {user.wardName}</span>}
               </div>
+              <Link
+                href="/account/password"
+                onClick={() => setMobileOpen(false)}
+                className="mb-2 inline-flex items-center gap-2 rounded-lg border border-brand-border px-3 py-2 text-xs font-semibold text-brand-textActive hover:border-brand-burnt hover:text-brand-burnt transition"
+              >
+                🔑 Change password
+              </Link>
               <LogoutButton />
             </div>
           </div>

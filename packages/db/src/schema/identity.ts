@@ -95,6 +95,9 @@ export const authCredentials = pgTable(
     failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
     lockedUntil: timestamp('locked_until', { withTimezone: true }),
     passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }).notNull().default(sql`now()`),
+    // True while the user is still on their system-assigned default (National ID);
+    // cleared when they set their own password.
+    mustChangePassword: boolean('must_change_password').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().default(sql`now()`),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().default(sql`now()`),
   },

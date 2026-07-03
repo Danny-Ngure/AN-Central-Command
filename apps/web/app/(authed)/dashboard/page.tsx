@@ -3,6 +3,7 @@ import { and, eq, gte, isNotNull, isNull, sql, inArray, desc } from 'drizzle-orm
 import {
   activities,
   communitySites,
+  db,
   meetings,
   people,
   pollingStations,
@@ -11,6 +12,7 @@ import {
 } from '@an/db';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
 import { withRlsTx } from '@/lib/api';
+import { WARD_TEAMS } from '@/data/ward-teams';
 import { ConstituencyMap } from '@/components/map/constituency-map';
 import { KpiTile, KpiIcons } from '@/components/kpi-tile';
 import { CoverageDonut } from '@/components/coverage-donut';
@@ -232,10 +234,36 @@ export default async function DashboardPage() {
       .limit(6);
 
     // ── Team size (Team Directory) ────────────────────────────────────
-    const [{ value: teamSize }] = await tx
-      .select({ value: sql<number>`count(*)::int` })
+    // Matches the Team page total: every active DB person PLUS the ward field-team
+    // roster members that aren't already a DB person (de-duplicated by name/ward).
+    // Read via `db` (NOT the RLS-scoped tx) so ward-scoped viewers still see the
+    // whole-constituency count — the Team Directory is org info everyone may see,
+    // and otherwise a ward member's Home page would only count their own ward.
+    const teamPeople = await db
+      .select({ fullName: people.fullName, wardId: people.wardId })
       .from(people)
-      .where(and(eq(people.active, true), isNull(people.deletedAt)));
+      .where(and(
+        eq(people.active, true),
+        isNull(people.deletedAt),
+        // Ignore login-only accounts (Dan's previews + the bulk Warembo/Flames/
+        // ward-team login rows) so the count matches the Team Directory (63).
+        sql`(${people.title} IS NULL OR ${people.title} NOT IN ('Preview account', 'Warembo wa Alfayo', 'Alfayo Flames', 'Ward teams'))`,
+      ));
+    const normName = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const wardNameById = new Map(wardRows.map((w) => [w.id, w.name]));
+    const dbNamesByWardName = new Map<string, Set<string>>();
+    for (const p of teamPeople) {
+      const wn = p.wardId ? wardNameById.get(p.wardId) : null;
+      if (!wn) continue;
+      if (!dbNamesByWardName.has(wn)) dbNamesByWardName.set(wn, new Set());
+      dbNamesByWardName.get(wn)!.add(normName(p.fullName));
+    }
+    let extraFieldTeam = 0;
+    for (const t of WARD_TEAMS) {
+      const names = dbNamesByWardName.get(t.ward) ?? new Set<string>();
+      extraFieldTeam += t.members.filter((m) => !names.has(normName(m.name))).length;
+    }
+    const teamSize = teamPeople.length + extraFieldTeam;
 
     return {
       wardRows,
@@ -321,11 +349,11 @@ export default async function DashboardPage() {
       </header>
 
       {/* ── Primary KPI ribbon — coloured by ANHF palette ─────────────── */}
-      <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <section className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
         <KpiTile
           label="Voters"
           value={totals.voters.toLocaleString()}
-          hint={`Across ${totals.stations} polling stations`}
+          hint={`Across ${totals.stations} polling centres`}
           tone="teal"
           icon={KpiIcons.Users}
           href="/voters"
@@ -363,12 +391,20 @@ export default async function DashboardPage() {
           href="/voters?age=youth"
         />
         <KpiTile
-          label="Polling stations"
+          label="Polling centres"
           value={totals.stations}
-          hint="Across all wards"
+          hint="30 centres · 158 stations"
           tone="teal"
           icon={KpiIcons.Pin}
-          href="/wards"
+          href="/polling-stations"
+        />
+        <KpiTile
+          label="Team"
+          value={totals.teamSize}
+          hint={`${totals.teamSize} active members`}
+          tone="amber"
+          icon={KpiIcons.Building}
+          href="/team?group=members"
         />
       </section>
 
@@ -566,7 +602,7 @@ export default async function DashboardPage() {
         <NavCard href="/voters"    title="Voter Search" desc="Look up any voter constituency-wide" icon={KpiIcons.Users} tone="teal" />
         <NavCard href="/analytics" title="Analytics"    desc="Polls, history, ward comparisons"     icon={KpiIcons.Spark} tone="sky" />
         <NavCard href="/meetings"  title="Meetings"     desc="Schedule, search contacts, WhatsApp"  icon={KpiIcons.Calendar} tone="orange" />
-        <NavCard href="/team"      title="Team"         desc={`${totals.teamSize} active members`}   icon={KpiIcons.Building} tone="deepBlue" />
+        <NavCard href="/team?group=members" title="Team"  desc={`${totals.teamSize} active members`}   icon={KpiIcons.Building} tone="deepBlue" />
       </section>
     </div>
   );

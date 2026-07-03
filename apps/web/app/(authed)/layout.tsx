@@ -1,6 +1,11 @@
 import { eq, isNull, asc } from 'drizzle-orm';
-import { db, people, villages, wards } from '@an/db';
+import Link from 'next/link';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { authCredentials, db, people, villages, wards } from '@an/db';
 import { AutoBreadcrumbs } from '@/components/auto-breadcrumbs';
+import { BackButton } from '@/components/back-button';
+import { BottomNav } from '@/components/bottom-nav';
 import { Countdown } from '@/components/countdown';
 import { QuickAdd } from '@/components/quick-add';
 import { SiteFooter } from '@/components/site-footer';
@@ -37,6 +42,44 @@ export default async function AuthedLayout({ children }: { children: React.React
   }
   const person = personRows[0]!;
 
+  // Nudge users who are still on their system default password (their National ID).
+  const credRows = await db
+    .select({ mustChange: authCredentials.mustChangePassword })
+    .from(authCredentials)
+    .where(eq(authCredentials.personId, claims.sub))
+    .limit(1);
+  const mustChangePassword = credRows[0]?.mustChange ?? false;
+
+  // Access model:
+  //   • Super Admins, constituency leadership, Ward Reps + their Assistants, and
+  //     Department Heads can VIEW everything in the app (all wards). Their writes
+  //     stay ward-scoped at the DB layer (RLS) — they can only ADD in their ward.
+  //   • Ordinary field members (canvasser, polling agent, polling station lead,
+  //     influence liaison) remain limited to Home + their own ward + their account.
+  // Keep this VIEW_ALL_ROLES set in sync with rls_can_view_all() in
+  // packages/db/extras/05_view_all_reads.sql.
+  const SUPER_ADMINS = new Set(['Alfayo Nelson', 'Benson Imoli', 'Dan Ngure', 'Irene Mkamburi']);
+  const VIEW_ALL_ROLES = new Set([
+    'candidate', 'campaign_manager', 'chief_strategist', 'constituency_coordinator', 'tech_lead',
+    'ward_coordinator', 'assistant_ward_coordinator',
+    'media_head', 'comms_head', 'finance_lead', 'patron_ceo',
+  ]);
+  const hasFullAccess = SUPER_ADMINS.has(person.fullName) || VIEW_ALL_ROLES.has(person.role);
+  const pathname = headers().get('x-pathname') ?? '';
+  if (!hasFullAccess && person.wardId) {
+    // Ward members get: the full Home page, their own ward hub, their account, and
+    // the Team directory (which RLS scopes to just their ward's team). Everything
+    // else — other wards, the polling-station index, constituency voter search — is
+    // out of reach, and RLS would return nothing for another ward anyway.
+    const allowed =
+      pathname === '/' ||
+      pathname === '/dashboard' ||
+      pathname.startsWith('/account') ||
+      pathname.startsWith('/team') ||
+      pathname.startsWith(`/wards/${person.wardId}`);
+    if (!allowed) redirect('/dashboard');
+  }
+
   let wardName: string | null = null;
   if (person.wardId) {
     const wardRows = await db
@@ -65,17 +108,40 @@ export default async function AuthedLayout({ children }: { children: React.React
       <TopNav user={{ fullName: person.fullName, role: person.role, wardName }} wards={allWards} villages={allVillages} />
       {/* SRS FR-090 — hero countdown strip, full-width below the main navbar. */}
       <Countdown />
+      {/* First-login nudge: still on the default (National ID) password. */}
+      {mustChangePassword && (
+        <div className="bg-brand-burnt/10 border-b border-brand-burnt/30">
+          <div className="max-w-[1600px] mx-auto px-4 lg:px-6 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-sm font-semibold text-brand-burnt">
+              🔑 You&apos;re still using your default password (your National ID). Please set a new one.
+            </span>
+            <Link
+              href="/account/password"
+              className="shrink-0 rounded-lg bg-brand-burnt px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-rust transition"
+            >
+              Change password →
+            </Link>
+          </div>
+        </div>
+      )}
       <main className="flex-1 overflow-auto">
         <div className="max-w-[1600px] mx-auto p-4 lg:p-6">
-          <AutoBreadcrumbs />
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <BackButton />
+            <AutoBreadcrumbs />
+          </div>
           {children}
         </div>
         {/* Full-width per-page footer — the hero photo changes per route.
             See apps/web/components/site-footer.tsx for the route → image map. */}
         <SiteFooter />
+        {/* Reserve space on mobile so the fixed bottom nav never covers content. */}
+        <div className="h-20 md:hidden" aria-hidden />
       </main>
       {/* Global quick-entry — log an activity from anywhere; flows into the system. */}
       <QuickAdd wards={allWards} />
+      {/* Persistent mobile bottom navigation — always one tap back to safety. */}
+      <BottomNav />
     </div>
   );
 }

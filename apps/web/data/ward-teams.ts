@@ -36,6 +36,7 @@ export const WARD_TEAMS: WardTeam[] = [
       { name: 'Rehema Wanjala', id: '28621941', phone: '0728289371', village: 'Karama' },
       { name: 'Ali Shatur', id: '29686931', phone: '0705833724', village: 'Sokoni Kongowea' },
       { name: 'William Tabu', id: '8620739', phone: '0725542499', village: 'Harambee' },
+      { name: 'Damaris Atuga', phone: '0724935918', village: 'Kambi Kikuyu' },
     ],
   },
   {
@@ -56,6 +57,8 @@ export const WARD_TEAMS: WardTeam[] = [
       { name: 'George Okelo', id: '23282104', phone: '0715865248', village: 'Sarajevo' },
       // Same person as the Frere Town Ward Representative "Nafisa Kalondu".
       { name: 'Nafisa Kalondu', id: '29257902', phone: '0754702216', village: 'Marhaba' },
+      { name: 'Sammy Nzaro Kahindi', id: '27936260', phone: '0728841829', village: 'BiteBite' },
+      { name: 'Janton Mwamboga', id: '30724405', phone: '0105343348', village: 'Mgongeni' },
     ],
   },
 ];

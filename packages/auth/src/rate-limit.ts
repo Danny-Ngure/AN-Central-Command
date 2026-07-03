@@ -29,20 +29,9 @@ function lockoutKey(identifier: string): string {
  * Check whether an authentication attempt is allowed for this identifier.
  * Call BEFORE consulting the DB to avoid lookup work on locked-out attempts.
  */
-export async function checkAuthRateLimit(identifier: string): Promise<RateLimitStatus> {
-  const redis = getRedis();
-  const lockoutTtl = await redis.ttl(lockoutKey(identifier));
-  if (lockoutTtl > 0) {
-    return { allowed: false, reason: 'locked_out', retryAfterSeconds: lockoutTtl };
-  }
-  const attempts = await redis.get(attemptsKey(identifier));
-  const count = attempts ? parseInt(attempts, 10) : 0;
-  if (count >= MAX_ATTEMPTS_PER_WINDOW) {
-    // Promote rapid retry burst to a lockout (5 fails in 60 seconds → 30 min lock).
-    await redis.set(lockoutKey(identifier), '1', 'EX', LOCKOUT_SECONDS);
-    await redis.del(attemptsKey(identifier));
-    return { allowed: false, reason: 'locked_out', retryAfterSeconds: LOCKOUT_SECONDS };
-  }
+export async function checkAuthRateLimit(_identifier: string): Promise<RateLimitStatus> {
+  // Account lockout / rate limiting DISABLED by request — logins never lock out.
+  // (Re-enable by restoring the Redis attempt + lockout checks below.)
   return { allowed: true };
 }
 

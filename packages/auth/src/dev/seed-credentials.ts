@@ -4,15 +4,16 @@ import './env-bootstrap';
 
 import { authCredentials, db, people } from '@an/db';
 import { eq } from 'drizzle-orm';
-import { hashPassword } from '../passwords';
+import { hashDefaultPassword } from '../passwords';
 
-// Dev-only seed script — gives every seeded person a known password so the login
-// flow can be exercised end-to-end via curl / Playwright.
+// Seed script — gives every person without credentials a DEFAULT password equal to
+// their National ID number. They then change it via /account/password (which enforces
+// the 12-char minimum). People with no National ID on file fall back to a dev password.
 //
-// Default password: "devpassword123!" (15 chars, meets BR-001.1 complexity).
-// DO NOT RUN IN ANY ENVIRONMENT THAT HOLDS REAL DATA.
+// National IDs are short (7–8 digits), so we hash them with hashDefaultPassword, which
+// skips the BR-001.1 length check that only applies to user-chosen passwords.
 
-const DEV_PASSWORD = 'devpassword123!';
+const FALLBACK_PASSWORD = 'devpassword123!';
 
 async function main() {
   if (process.env.NODE_ENV === 'production') {
@@ -20,13 +21,15 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('Seeding auth_credentials for all dev people...');
-  const hashed = await hashPassword(DEV_PASSWORD);
+  console.log('Seeding auth_credentials (default password = National ID)...');
 
-  const allPeople = await db.select({ id: people.id, fullName: people.fullName, role: people.role }).from(people);
+  const allPeople = await db
+    .select({ id: people.id, fullName: people.fullName, role: people.role, nationalId: people.nationalId })
+    .from(people);
 
   let inserted = 0;
   let skipped = 0;
+  let fallback = 0;
   for (const p of allPeople) {
     const existing = await db
       .select({ id: authCredentials.id })
@@ -37,22 +40,25 @@ async function main() {
       skipped += 1;
       continue;
     }
+    const nid = (p.nationalId ?? '').trim();
+    const rawDefault = nid.length > 0 ? nid : FALLBACK_PASSWORD;
+    if (nid.length === 0) fallback += 1;
+    const hashed = await hashDefaultPassword(rawDefault);
     await db.insert(authCredentials).values({
       personId: p.id,
       passwordHash: hashed,
+      // On a default (National ID) password, nudge the user to change it.
+      mustChangePassword: true,
       // TOTP not enrolled. login() will return AUTH_2FA_NOT_ENROLLED for roles that
       // require 2FA — that's correct behavior; production wires an enrollment flow.
     });
     inserted += 1;
-    console.log(`  ✓ ${p.fullName} (${p.role})`);
+    console.log(`  ✓ ${p.fullName} (${p.role}) — default = ${nid.length > 0 ? 'National ID' : 'fallback password'}`);
   }
 
-  console.log(`\nDone. ${inserted} credentials inserted, ${skipped} skipped (already existed).`);
-  console.log(`\nLogin for everyone is password "${DEV_PASSWORD}".`);
-  console.log('Example:');
-  console.log(`  curl -X POST http://localhost:3000/api/auth/login \\`);
-  console.log(`       -H "Content-Type: application/json" \\`);
-  console.log(`       -d '{"phoneOrEmail":"+254700000002","password":"${DEV_PASSWORD}","client":"mobile"}'`);
+  console.log(`\nDone. ${inserted} credentials inserted, ${skipped} skipped, ${fallback} used the fallback (no National ID).`);
+  console.log(`Everyone's default password is their National ID number; ${fallback} without an ID use "${FALLBACK_PASSWORD}".`);
+  console.log('Users change it at /account/password (min 12 characters).');
   console.log('');
   console.log('  Note: roles requiring 2FA (campaign_manager, ward_coordinator, etc.) will');
   console.log('  return AUTH_2FA_NOT_ENROLLED until TOTP enrollment is added. Use the');

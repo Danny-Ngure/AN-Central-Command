@@ -1,6 +1,7 @@
 // Public surface of @an/auth.
 
-export { hashPassword, verifyPassword } from './passwords';
+export { hashPassword, hashDefaultPassword, verifyPassword } from './passwords';
+export { changePassword, type ChangePasswordResult } from './change-password';
 export { generateTotpSecret, verifyTotp, type TotpEnrollment } from './totp';
 export { signSessionJwt, verifySessionJwt, type SessionClaims } from './jwt';
 export { getRedis } from './redis';

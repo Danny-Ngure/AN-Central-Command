@@ -28,6 +28,17 @@ export async function hashPassword(plain: string): Promise<string> {
 }
 
 /**
+ * Hash a SYSTEM-ASSIGNED default password (e.g. a person's National ID) that may be
+ * shorter than the BR-001.1 12-char minimum. Only for initial credential setup — the
+ * user is expected to change it to a compliant password on first login. Never use
+ * this for user-chosen passwords (use hashPassword, which enforces the minimum).
+ */
+export async function hashDefaultPassword(plain: string): Promise<string> {
+  if (!plain) throw new Error('Default password cannot be empty');
+  return hash(plain, ARGON2_OPTIONS);
+}
+
+/**
  * Verify a plaintext password against a stored hash. Constant-time on success and
  * failure paths; safe to expose timing differences are not a leak.
  */
