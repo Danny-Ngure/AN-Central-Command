@@ -74,3 +74,6 @@ Login-Credentials.pdf
 *credentials*.pdf
 fix-admin-login.ps1
 packages/auth/src/dev/roster-data.json
+
+# Contains hardcoded admin passwords — local only
+packages/auth/src/dev/set-tiered-passwords.ts
