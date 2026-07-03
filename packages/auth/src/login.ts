@@ -1,5 +1,5 @@
 import { authCredentials, db, people } from '@an/db';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import { verifyPassword } from './passwords';
 import { verifyTotp } from './totp';
 import { checkAuthRateLimit, recordAuthFailure, resetAuthAttempts } from './rate-limit';
@@ -39,7 +39,15 @@ const SUPER_USERS_BYPASS_2FA: ReadonlySet<string> = new Set([
   'Alfayo Nelson',
   'Benson Imoli',
   'Dan Ngure',
+  'Irene Mkamburi',
 ]);
+
+// DEV-ONLY: the TOTP enrolment UI isn't wired yet, so in non-production environments
+// we let every role log in with just a password (BR-001.2 stays fully enforced in
+// production, where NODE_ENV === 'production'). Flip AUTH_ENFORCE_2FA=true to force
+// the 2FA wall back on in dev for testing the enrolment path.
+const DISABLE_2FA_IN_DEV =
+  process.env.NODE_ENV !== 'production' && process.env.AUTH_ENFORCE_2FA !== 'true';
 
 // SRS BR-001.3: session TTLs.
 const SESSION_TTL_WEB_SECONDS = 24 * 60 * 60;
@@ -83,6 +91,25 @@ export type LoginResult =
       enrollmentToken?: string;
     };
 
+// Kenyan phones are entered inconsistently (07…, +254…, 254…, or bare 7…). We
+// store one canonical spelling but must match whatever the user types. Given any
+// identifier this returns every equivalent spelling so the DB lookup can match on
+// any of them. Non-phone identifiers (email, the literal "ADMIN001") pass through
+// unchanged so they still match exactly.
+export function phoneVariants(raw: string): string[] {
+  const s = (raw ?? '').trim();
+  if (!s) return [];
+  // Anything containing a letter (email, "ADMIN001") is not a phone → literal.
+  if (/[a-zA-Z]/.test(s)) return [s];
+  const digits = s.replace(/\D/g, '');
+  let core = digits;
+  if (core.startsWith('254')) core = core.slice(3);
+  else if (core.startsWith('0')) core = core.slice(1);
+  // Kenyan mobile subscriber numbers are 7XXXXXXXX or 1XXXXXXXX (9 digits).
+  if (!/^[17]\d{8}$/.test(core)) return [s];
+  return [`0${core}`, `+254${core}`, `254${core}`, core, s];
+}
+
 export async function login(input: LoginInput): Promise<LoginResult> {
   // (1) Rate limit.
   const rate = await checkAuthRateLimit(input.phoneOrEmail);
@@ -94,14 +121,20 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     };
   }
 
-  // (2) Find the person.
+  // (2) Find the person by phone or email. The user may type the phone in any
+  // format (07…, +254…, 254…, bare 7…) — phoneVariants() expands the input to all
+  // equivalent spellings so it matches whatever spelling we stored. The special
+  // admin (Dan Ngure) uses the literal phone "ADMIN001", handled as a literal.
+  const candidates = phoneVariants(input.phoneOrEmail);
   const personRows = await db
     .select()
     .from(people)
     .where(
-      sql`(${people.phone} = ${input.phoneOrEmail} OR ${people.email} = ${input.phoneOrEmail})
-          AND ${people.active} = true
-          AND ${people.deletedAt} IS NULL`,
+      and(
+        or(inArray(people.phone, candidates), eq(people.email, input.phoneOrEmail)),
+        eq(people.active, true),
+        isNull(people.deletedAt),
+      ),
     )
     .limit(1);
 
@@ -125,26 +158,16 @@ export async function login(input: LoginInput): Promise<LoginResult> {
   }
   const cred = credentialRows[0];
 
-  // (4) DB-level lockout check (in addition to Redis short-term).
-  if (cred.lockedUntil && cred.lockedUntil.getTime() > Date.now()) {
-    return {
-      ok: false,
-      code: 'AUTH_ACCOUNT_LOCKED',
-      retryAfterSeconds: Math.ceil((cred.lockedUntil.getTime() - Date.now()) / 1000),
-    };
-  }
+  // (4) Account lockout DISABLED by request — no lock check, and failures never lock
+  // the account. We still count failures for visibility, but never set locked_until.
 
   // (5) Verify password.
   const passwordOk = await verifyPassword(input.password, cred.passwordHash);
   if (!passwordOk) {
     await recordAuthFailure(input.phoneOrEmail);
-    const nextCount = cred.failedLoginAttempts + 1;
     const update: Partial<typeof authCredentials.$inferInsert> = {
-      failedLoginAttempts: nextCount,
+      failedLoginAttempts: cred.failedLoginAttempts + 1,
     };
-    if (nextCount >= FAILED_ATTEMPTS_BEFORE_DB_LOCKOUT) {
-      update.lockedUntil = new Date(Date.now() + DB_LOCKOUT_DURATION_MS);
-    }
     await db.update(authCredentials).set(update).where(eq(authCredentials.id, cred.id));
     return { ok: false, code: 'AUTH_INVALID_CREDENTIALS' };
   }
@@ -153,7 +176,8 @@ export async function login(input: LoginInput): Promise<LoginResult> {
   // defined above — see comment there for revert instructions.
   if (
     ROLES_REQUIRING_2FA.has(person.role) &&
-    !SUPER_USERS_BYPASS_2FA.has(person.fullName)
+    !SUPER_USERS_BYPASS_2FA.has(person.fullName) &&
+    !DISABLE_2FA_IN_DEV
   ) {
     if (!cred.totpSecret) {
       // SRS AC-001.4 — force enrolment on next login. Issue a short-lived token

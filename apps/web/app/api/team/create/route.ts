@@ -5,6 +5,9 @@ import { eq } from 'drizzle-orm';
 import { auditLog, db, people, wards } from '@an/db';
 import { getServerAuth } from '@/lib/server-auth';
 import { err, ok, type ErrorEnvelope, type SuccessEnvelope } from '@/lib/api';
+// Who may add a (rank-and-file) team member, and which roles count as an admin
+// "power grant" reserved for the Super Admin (Dan). See lib/admin.ts.
+import { ELEVATED_ROLES, MEMBER_CREATOR_ROLES, isSuperAdmin } from '@/lib/admin';
 
 export const runtime = 'nodejs';
 
@@ -27,14 +30,6 @@ export const runtime = 'nodejs';
 //   warembo             → Warembo wa Alfayo wing (title forced to include "Warembo"
 //                         so the directory's isWarembo() picks them up)
 
-const PRIVILEGED_ROLES = new Set([
-  'candidate',
-  'campaign_manager',
-  'chief_strategist',
-  'constituency_coordinator',
-  'tech_lead',
-]);
-
 type Category = 'executive' | 'technical' | 'ward' | 'warembo';
 
 const EXEC_ROLES = new Set([
@@ -55,8 +50,8 @@ export async function POST(
 ): Promise<NextResponse<SuccessEnvelope<{ id: string; fullName: string }> | ErrorEnvelope>> {
   const claims = await getServerAuth();
   if (!claims) return err('AUTH_REQUIRED', 'Authentication required', 401);
-  if (!PRIVILEGED_ROLES.has(claims.role)) {
-    return err('AUTHZ_INSUFFICIENT_ROLE', 'Your role cannot add team members. Ask a campaign manager or tech lead.', 403);
+  if (!MEMBER_CREATOR_ROLES.has(claims.role)) {
+    return err('AUTHZ_INSUFFICIENT_ROLE', 'Your role cannot add team members. Ask an executive admin (Alfayo, Benson, Irene) or Dan.', 403);
   }
 
   let form: FormData;
@@ -98,6 +93,17 @@ export async function POST(
     title = title
       ? (/warembo/i.test(title) ? title : `${title} · Warembo wa Alfayo`)
       : 'Warembo wa Alfayo';
+  }
+
+  // Power-grant guard: assigning an admin/leadership role is reserved for the Super
+  // Admin (Dan). Executive admins (Alfayo/Benson/Irene) can add rank-and-file members
+  // but cannot hand out admin authority.
+  if (ELEVATED_ROLES.has(role) && !(await isSuperAdmin(claims.sub))) {
+    return err(
+      'AUTHZ_ELEVATION_SUPER_ONLY',
+      'Only the Super Admin (Dan) can assign an admin/leadership role. You can add ordinary members.',
+      403,
+    );
   }
 
   // Validate the ward exists, when one was supplied.

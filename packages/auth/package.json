@@ -10,7 +10,15 @@
     "lint": "node -e \"console.log('placeholder')\"",
     "type-check": "tsc --noEmit",
     "test": "node -e \"console.log('placeholder')\"",
-    "seed:credentials": "tsx src/dev/seed-credentials.ts"
+    "seed:credentials": "tsx src/dev/seed-credentials.ts",
+    "set:admins": "tsx src/dev/set-admin-logins.ts",
+    "create:view-as": "tsx src/dev/create-view-as-accounts.ts",
+    "set:team": "tsx src/dev/set-team-logins.ts",
+    "provision:all": "tsx src/dev/provision-all-logins.ts",
+    "deprovision:roster": "tsx src/dev/deprovision-roster-logins.ts",
+    "reset:passwords": "tsx src/dev/reset-passwords-to-id.ts",
+    "reset:all": "tsx src/dev/reset-all-to-password.ts",
+    "unlock": "tsx src/dev/unlock-account.ts"
   },
   "dependencies": {
     "@an/db": "workspace:*",

@@ -3,8 +3,10 @@ import { notFound } from 'next/navigation';
 import { sql } from 'drizzle-orm';
 import { db } from '@an/db';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
+import { isSuperAdmin } from '@/lib/admin';
 import { PhoneActions } from '@/components/phone-actions';
 import { IdCard } from '@/components/id-card';
+import { AdminResetPassword } from '@/components/admin-reset-password';
 
 // Person 360 — one screen that pulls a team member together with every other
 // place they appear in the system:
@@ -25,8 +27,20 @@ const ROLE_LABEL: Record<string, string> = {
   tech_lead: 'Tech Lead', finance_lead: 'Finance Lead',
 };
 
+// Verified IEBC registrations for members whose registered name differs from their
+// campaign name, so the name/phone/ID auto-match can't find them. Confirmed against
+// the official IEBC Voter Verification Portal (verify.iebc.or.ke). Keyed by campaign
+// full name. Alfayo Nelson is registered as "Nyangwara Nelson".
+const MANUAL_REGISTRATION: Record<
+  string,
+  { registeredAs: string; ward: string; pollingCentre: string; pollingCode?: string | null; nationalId?: string | null }
+> = {
+  'Alfayo Nelson': { registeredAs: 'Nyangwara Nelson', ward: 'Kadzandani', pollingCentre: 'Mwatamba Grounds' },
+};
+
 export default async function PersonProfile({ params }: { params: { id: string } }) {
-  await getServerAuthOrRedirect();
+  const claims = await getServerAuthOrRedirect();
+  const viewerIsSuper = await isSuperAdmin(claims.sub);
 
   const personRows = (await db.execute(sql`
     SELECT p.id, p.full_name, p.role, p.title, p.phone, p.email, p.national_id,
@@ -79,6 +93,25 @@ export default async function PersonProfile({ params }: { params: { id: string }
     LIMIT 10
   `)) as any[];
 
+  // Fall back to a verified IEBC registration when the auto-match found nothing
+  // (e.g. Alfayo is registered under a different name). Shape it like a voter row.
+  const manualReg = MANUAL_REGISTRATION[p.full_name];
+  const regRows: any[] =
+    voters.length > 0
+      ? voters
+      : manualReg
+        ? [
+            {
+              first_name: manualReg.registeredAs.split(' ')[0],
+              surname: manualReg.registeredAs.split(' ').slice(1).join(' '),
+              national_id: manualReg.nationalId ?? null,
+              ward_name: manualReg.ward,
+              ps_name: manualReg.pollingCentre,
+              ps_code: manualReg.pollingCode ?? null,
+            },
+          ]
+        : [];
+
   const ver = p.last_active_at ? new Date(p.last_active_at).getTime() : 0;
   const photoSrc = p.photo_url ? `${p.photo_url}?v=${ver}` : null;
   const roleLabel = p.title || ROLE_LABEL[p.role] || p.role;
@@ -95,6 +128,9 @@ export default async function PersonProfile({ params }: { params: { id: string }
 
       <h1 className="sr-only">{p.full_name}</h1>
 
+      {/* Super-admin (Dan) only: reset this member's password. */}
+      {viewerIsSuper && <AdminResetPassword personId={p.id} name={p.full_name} />}
+
       {/* Member ID card (both sides) */}
       <Section title="Member ID Card" subtitle="Official ANHF membership identification — front &amp; back">
         <IdCard
@@ -107,8 +143,8 @@ export default async function PersonProfile({ params }: { params: { id: string }
           nationalId={p.national_id}
           phone={p.phone}
           agentId={p.agent_id}
-          pollingCentre={voters[0]?.ps_name ?? null}
-          pollingCode={voters[0]?.ps_code ?? null}
+          pollingCentre={regRows[0]?.ps_name ?? null}
+          pollingCode={regRows[0]?.ps_code ?? null}
         />
       </Section>
 
@@ -132,14 +168,14 @@ export default async function PersonProfile({ params }: { params: { id: string }
 
       {/* Where they vote */}
       <Section title="Where they vote" subtitle="From the IEBC voter register">
-        {voters.length === 0 ? (
+        {regRows.length === 0 ? (
           <EmptyNote>
             No voter-register match found. Add this member&apos;s <strong>National ID</strong> to their record
             to link their polling station automatically.
           </EmptyNote>
         ) : (
           <ul className="space-y-2">
-            {voters.map((v, i) => (
+            {regRows.map((v, i) => (
               <li key={i} className="rounded-lg border border-brand-border bg-brand-cardBgHeavy px-4 py-3">
                 <div className="text-sm font-bold text-brand-textActive">
                   {v.ps_name ?? 'Polling station unknown'}
@@ -176,7 +212,7 @@ export default async function PersonProfile({ params }: { params: { id: string }
               tone="sky"
             />
           ))}
-          {voters.map((v, i) => (
+          {regRows.map((v, i) => (
             <RoleRow key={`v${i}`} tag="IEBC voter" label={`Registered voter${v.ward_name ? ` — ${v.ward_name} Ward` : ''}`} tone="olive" />
           ))}
         </div>
