@@ -27,7 +27,7 @@ import { CURRENT_POLLS, computePollAverage } from '@/data/current-polls';
 // All charts are constrained max-w-md/xl/2xl so they read like dashboard charts
 // rather than full-page banners. Each chart has a small commentary line below it.
 
-type Tab = 'pollings' | 'history' | '2013' | '2017' | '2022' | 'analysis';
+type Tab = 'pollings' | 'history' | '2013' | '2017' | '2022' | 'analysis' | 'wards';
 
 const COLORS = {
   ours:    '#ff6600',
@@ -47,9 +47,24 @@ interface PageProps {
 
 export default async function AnalyticsPage({ searchParams }: PageProps) {
   const claims = await getServerAuthOrRedirect();
-  const tab: Tab = (['pollings', 'history', '2013', '2017', '2022', 'analysis'].includes(searchParams.tab ?? '')
+  const tab: Tab = (['pollings', 'history', '2013', '2017', '2022', 'analysis', 'wards'].includes(searchParams.tab ?? '')
     ? searchParams.tab
     : 'pollings') as Tab;
+
+  // Per-ward demographics from the real voter register — for the Ward case studies tab.
+  const wardDemo = tab === 'wards'
+    ? await withRlsTx(claims, async (tx) => (await tx.execute(sql`
+        SELECT w.id, w.name,
+          count(*)::int AS voters,
+          count(*) FILTER (WHERE v.gender = 'M')::int AS men,
+          count(*) FILTER (WHERE v.gender = 'F')::int AS women,
+          count(*) FILTER (WHERE date_part('year', age(v.date_of_birth)) BETWEEN 25 AND 34)::int AS a25_34,
+          count(*) FILTER (WHERE date_part('year', age(v.date_of_birth)) BETWEEN 35 AND 44)::int AS a35_44,
+          count(*) FILTER (WHERE date_part('year', age(v.date_of_birth)) BETWEEN 45 AND 54)::int AS a45_54,
+          count(*) FILTER (WHERE date_part('year', age(v.date_of_birth)) >= 55)::int AS a55p
+        FROM wards w LEFT JOIN voters v ON v.ward_id = w.id AND v.consent_withdrawn_at IS NULL
+        GROUP BY w.id, w.name ORDER BY w.name`)) as any[])
+    : null;
 
   // Only load voter demographics for the analysis tab.
   const ourDemo = tab === 'analysis'
@@ -74,16 +89,18 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
 
   // Real registered-voter weight per ward — used to project the per-ward split of
   // a complete cycle's result (the only honest basis we have for a per-ward view).
-  const wardWeights = (['2013', '2017', '2022'].includes(tab))
+  const wardWeights = (['2013', '2017', '2022', 'analysis'].includes(tab))
     ? await withRlsTx(claims, async (tx) => {
         const rows = (await tx.execute(sql`
-          SELECT w.name AS name, COUNT(v.*)::int AS registered
+          SELECT w.name AS name, COUNT(v.*)::int AS registered,
+                 count(*) FILTER (WHERE v.gender = 'M')::int AS men,
+                 count(*) FILTER (WHERE v.gender = 'F')::int AS women
           FROM wards w
           LEFT JOIN voters v ON v.ward_id = w.id AND v.consent_withdrawn_at IS NULL
           GROUP BY w.name
           ORDER BY w.name
         `)) as any[];
-        return rows.map((r) => ({ name: String(r.name), registered: Number(r.registered) }));
+        return rows.map((r) => ({ name: String(r.name), registered: Number(r.registered), men: Number(r.men), women: Number(r.women) }));
       })
     : null;
 
@@ -105,6 +122,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
         <TabLink href="/analytics?tab=2017" active={tab === '2017'}>2017</TabLink>
         <TabLink href="/analytics?tab=2022" active={tab === '2022'}>2022</TabLink>
         <TabLink href="/analytics?tab=analysis" active={tab === 'analysis'}>Analysis &amp; demographics</TabLink>
+        <TabLink href="/analytics?tab=wards" active={tab === 'wards'}>Ward case studies</TabLink>
       </nav>
 
       {tab === 'pollings'  && <TabPollings />}
@@ -112,7 +130,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
       {tab === '2013'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2013)!} wardWeights={wardWeights} />}
       {tab === '2017'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2017)!} wardWeights={wardWeights} />}
       {tab === '2022'      && <TabCycle election={HISTORICAL_ELECTIONS.find((e) => e.year === 2022)!} wardWeights={wardWeights} />}
-      {tab === 'analysis'  && <TabAnalysis demo={ourDemo} />}
+      {tab === 'analysis'  && <TabAnalysis demo={ourDemo} wardWeights={wardWeights} />}
+      {tab === 'wards'     && <TabWardStudies demo={wardDemo} />}
     </div>
   );
 }
@@ -237,7 +256,7 @@ function TabHistory() {
 
 // ─── TAB: Per-cycle (2013 / 2017 / 2022) ──────────────────────────────────────
 
-function TabCycle({ election, wardWeights }: { election: HistoricalElection; wardWeights: { name: string; registered: number }[] | null }) {
+function TabCycle({ election, wardWeights }: { election: HistoricalElection; wardWeights: { name: string; registered: number; men: number; women: number }[] | null }) {
   const trend = CYCLE_TRENDS.find((t) => t.year === election.year);
   const winner = election.candidates.find((c) => c.isWinner)!;
   const runnerUp = election.candidates.find((c) => !c.isWinner);
@@ -363,11 +382,21 @@ function TabCycle({ election, wardWeights }: { election: HistoricalElection; war
 // wards in proportion to each ward's REAL registered-voter count (uniform model).
 // Honest framing: the ward WEIGHT pie is real data; the per-candidate split is an
 // estimate, because official per-ward MP tallies are not published.
+// Qualitative political read per ward — grounded in each ward's demographic profile,
+// Mohamed Ali's "Jicho Pevu" brand, and Coast/ODM dynamics. Analysis, not vote data.
+const POLITICAL_REASONING: Record<string, string> = {
+  Kongowea: 'A dense market-and-casual-labour economy with the seat’s biggest and most male-skewed register. These working-class voters warmed to Mohamed Ali’s “Jicho Pevu” anti-graft, man-of-the-people brand over the ODM establishment. The contest here is turnout, not persuasion — mobilise the base and the seat follows.',
+  Mkomani: 'Spans the affluent Nyali estate and mixed neighbourhoods, so it tracks the overall constituency mood rather than leading it. A barometer ward that rewards a proven, visible incumbent and punishes complacency — hold the middle and you hold the seat.',
+  'Frere Town': 'The genuine swing ward — mixed and competitive, with no locked-in loyalty. Small shifts here decide close races, so message discipline and ground presence matter more than anywhere else; it is won or lost at the margin.',
+  "Ziwa La Ng'ombe": 'Historically the most ODM-receptive ward, so Said’s party machine bites hardest here and Mohamed’s projected margin is thinnest. A ward to defend, not assume — organised ODM turnout could erode the lead if left unattended.',
+  Kadzandani: 'Cross-pressured, with fluid party loyalties that swing cycle to cycle — it belongs to whoever campaigns hardest. A persuasion ward where both message and mobilisation count; neither side can take it for granted.',
+};
+
 function PerWardProjection({
   election, wardWeights,
 }: {
   election: HistoricalElection;
-  wardWeights: { name: string; registered: number }[];
+  wardWeights: { name: string; registered: number; men: number; women: number }[];
 }) {
   const totalReg = wardWeights.reduce((s, w) => s + w.registered, 0) || 1;
   const top3 = [...election.candidates]
@@ -386,6 +415,7 @@ function PerWardProjection({
   const totalAll = shareBase;
   const winnerC = top3[0];
   const runnerC = top3[1];
+  const constMargin = winnerC && runnerC ? winnerC.votes - runnerC.votes : 0;
   const sharePct = (v: number) => (v / totalAll) * 100;
 
   // Estimated votes per ward per top-3 candidate (uniform model).
@@ -416,7 +446,8 @@ function PerWardProjection({
         </div>
         <BarChart
           yAxisLabel="Registered voters"
-          bars={wardWeights.map((w, i) => ({ label: w.name, value: w.registered, color: palette[i] ?? COLORS.neutral, hint: `${((w.registered / totalReg) * 100).toFixed(1)}%` }))}
+          max={Math.ceil(Math.max(...wardWeights.map((w) => w.registered), 1) / 5000) * 5000}
+          bars={wardWeights.map((w, i) => ({ label: w.name === "Ziwa La Ng'ombe" ? 'Ziwa' : w.name, value: w.registered, color: palette[i] ?? COLORS.neutral, hint: `${((w.registered / totalReg) * 100).toFixed(1)}%` }))}
         />
       </div>
 
@@ -481,27 +512,82 @@ function PerWardProjection({
         </table>
       </div>
 
-      {/* Per-ward top-3 donuts — winner share in the centre */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-6">
-        {wardWeights.map((w) => (
-          <div key={w.name} className="flex flex-col items-center">
-            <Pie
-              donut size={120}
-              showLegend={false}
-              centerText={winnerC ? `${sharePct(winnerC.votes).toFixed(0)}%` : ''}
-              centerSubText={winnerC ? winnerC.name.split(' ')[0] : ''}
-              data={top3.map((c, i) => ({ label: c.name.split(' ')[0], value: est(c.votes, w.registered), color: palette[i] ?? COLORS.neutral }))}
-            />
-            <div className="text-[11px] font-semibold text-brand-textActive mt-1">{w.name}</div>
-            <div className="text-[10px] text-brand-textMuted">~{w.registered.toLocaleString()} voters</div>
-          </div>
-        ))}
+      {/* Per-ward detail — one horizontal card each, differentiated + explained.
+          The winner-share % is uniform under the model, so the graphic here is each
+          ward's SHARE OF THE WINNER'S TOTAL (which really does differ by ward). */}
+      <div className="mt-6 space-y-3">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-brand-textMuted">Ward-by-ward — projected contribution &amp; detail</div>
+        {[...wardWeights].sort((a, b) => b.registered - a.registered).map((w, idx) => {
+          const ew = winnerC ? est(winnerC.votes, w.registered) : 0;
+          const er = runnerC ? est(runnerC.votes, w.registered) : 0;
+          const margin = ew - er;
+          const hhTotal = ew + er || 1;
+          const hhWin = (ew / hhTotal) * 100;
+          const hhRun = (er / hhTotal) * 100;
+          const shareOfWinner = winnerC ? (ew / winnerC.votes) * 100 : 0;
+          const weightPct = (w.registered / totalReg) * 100;
+          const marginContrib = constMargin > 0 ? (margin / constMargin) * 100 : 0;
+          const swingToLevel = Math.max(0, Math.round(margin / 2));
+          const profile = WARD_PROFILES.find((p) => p.name === w.name);
+          const wN = winnerC?.name.split(' ')[0] ?? 'Winner';
+          const rN = runnerC?.name.split(' ')[0] ?? 'Runner';
+          const menPct = w.registered ? (w.men / w.registered) * 100 : 0;
+          const womenPct = 100 - menPct;
+          const swingPts = Math.max(0, hhWin - 50);
+          const reasoning = POLITICAL_REASONING[w.name];
+          return (
+            <div key={w.name} className="rounded-xl border border-brand-border bg-brand-cardBg overflow-hidden">
+              <div className="flex flex-col lg:flex-row lg:items-stretch divide-y lg:divide-y-0 lg:divide-x divide-brand-border">
+                {/* Clean, professional donut — each candidate's % in this ward */}
+                <div className="lg:w-[220px] shrink-0 p-4 flex flex-col items-center justify-center gap-2.5">
+                  <div className="text-xs font-bold text-brand-textActive text-center">#{idx + 1} · {w.name}</div>
+                  <Pie
+                    donut size={122} showLegend={false}
+                    centerText={`${hhWin.toFixed(0)}%`} centerSubText={wN}
+                    data={[
+                      { label: wN, value: ew, color: palette[0] },
+                      { label: rN, value: er, color: palette[1] },
+                    ]}
+                  />
+                  <div className="flex flex-col gap-1 w-full text-[11px]">
+                    <div className="flex items-center justify-between"><span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: palette[0] }} />{wN}</span><b className="tabular-nums">{ew.toLocaleString()} · {hhWin.toFixed(0)}%</b></div>
+                    <div className="flex items-center justify-between"><span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: palette[1] }} />{rN}</span><b className="tabular-nums">{er.toLocaleString()} · {hhRun.toFixed(0)}%</b></div>
+                  </div>
+                  {profile && <span className={behaviourBadgeClass(profile.behaviour)}>{profile.oneLiner}</span>}
+                </div>
+
+                {/* Analyst read — figures → ward state → political reasoning */}
+                <div className="flex-1 min-w-[260px] p-4 space-y-3 text-xs leading-relaxed">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: COLORS.teal }}>1 · The figures</div>
+                    <p className="text-brand-textBody">
+                      Projected <strong style={{ color: palette[0] }}>{wN} ~{ew.toLocaleString()} ({hhWin.toFixed(0)}%)</strong> vs{' '}
+                      <strong style={{ color: palette[1] }}>{rN} ~{er.toLocaleString()} ({hhRun.toFixed(0)}%)</strong> — a <strong>+{margin.toLocaleString()}</strong> lead,
+                      ~{marginContrib.toFixed(1)}% of {wN}&apos;s entire {election.year} winning margin. {rN} would need a ~{swingPts.toFixed(0)}-pt swing (~{swingToLevel.toLocaleString()} net votes) to draw level.
+                    </p>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: COLORS.teal }}>2 · State of the ward</div>
+                    <p className="text-brand-textBody">
+                      #{idx + 1} by size — <strong>{w.registered.toLocaleString()} voters</strong> ({weightPct.toFixed(1)}% of the seat).
+                      Register skews <strong>{menPct.toFixed(0)}% men / {womenPct.toFixed(0)}% women</strong>{menPct >= 60 ? ' — markedly male' : menPct <= 53 ? ' — the most gender-balanced ward' : ''}. {profile?.note ?? ''}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: COLORS.ours }}>3 · Why they vote this way</div>
+                    <p className="text-brand-textBody">{reasoning ?? 'Field-level political read pending for this ward.'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <Caption>
         Top 3 ({election.year}): {top3.map((c) => `${c.name.split(' ')[0]} ${c.votes.toLocaleString()}`).join(' · ')}.
-        Kongowea and the larger wards carry the most weight, so they dominate the projected counts — which is why
-        turnout there decides the seat.
+        The winner&apos;s share is uniform under this model, so each ward is ranked by how much of the winner&apos;s total it delivers —
+        {' '}Kongowea and the larger wards carry the most weight, which is why turnout there decides the seat. Estimates only; per-ward MP tallies aren&apos;t published.
       </Caption>
     </ChartCard>
   );
@@ -509,7 +595,7 @@ function PerWardProjection({
 
 // ─── TAB: Analysis & Demographics ─────────────────────────────────────────────
 
-function TabAnalysis({ demo }: { demo: any | null }) {
+function TabAnalysis({ demo, wardWeights }: { demo: any | null; wardWeights: { name: string; registered: number; men: number; women: number }[] | null }) {
   const total       = Number(demo?.total ?? 0);
   const ourMen      = Number(demo?.men ?? 0);
   const ourWomen    = Number(demo?.women ?? 0);
@@ -524,8 +610,91 @@ function TabAnalysis({ demo }: { demo: any | null }) {
   };
   const swissSample = CURRENT_POLLS[0];
 
+  // Per-ward VOTER WEIGHT — the only credible per-ward electoral metric we have
+  // (there is no published per-ward MP tally). Each ward's share of the register is
+  // its share of the decision. Merge with the qualitative profile for commentary.
+  const weights = (wardWeights ?? []).map((w) => ({
+    ...w,
+    profile: WARD_PROFILES.find((p) => p.name === w.name),
+  }));
+  const totalReg = weights.reduce((s, w) => s + w.registered, 0) || 1;
+  const rankedWeights = [...weights].sort((a, b) => b.registered - a.registered);
+  const maxReg = Math.max(...weights.map((w) => w.registered), 1);
+  const pctOf = (n: number) => (n / totalReg) * 100;
+
   return (
     <div className="space-y-5">
+      {/* Who decides the seat — voter weight by ward */}
+      {rankedWeights.length > 0 && (
+        <ChartCard title="Who decides the seat — voter weight by ward" subtitle="each ward's share of the registered voters = its share of the outcome">
+          <div className="space-y-2.5">
+            {rankedWeights.map((w, i) => {
+              const pct = pctOf(w.registered);
+              return (
+                <div key={w.name}>
+                  <div className="flex items-baseline justify-between text-xs">
+                    <span className="font-semibold text-brand-textActive">
+                      {i === 0 && <span title="Largest bloc">👑 </span>}{w.name}
+                      {w.profile && <span className="ml-1 text-brand-textMuted">· {w.profile.oneLiner}</span>}
+                    </span>
+                    <span className="font-bold tabular-nums text-brand-textActive">
+                      {w.registered.toLocaleString()} <span className="text-brand-textMuted font-normal">({pct.toFixed(1)}%)</span>
+                    </span>
+                  </div>
+                  <div className="mt-1 h-3.5 rounded-full bg-black/10 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(w.registered / maxReg) * 100}%`, background: i === 0 ? COLORS.ours : COLORS.sky }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-xs text-brand-textMuted leading-relaxed">
+            {rankedWeights[0]?.name} carries the biggest bloc ({pctOf(rankedWeights[0]?.registered ?? 0).toFixed(1)}% of the register) —
+            turnout there moves the constituency result more than anywhere else. The top two wards
+            ({rankedWeights.slice(0, 2).map((w) => w.name).join(' + ')}) alone hold{' '}
+            {pctOf((rankedWeights[0]?.registered ?? 0) + (rankedWeights[1]?.registered ?? 0)).toFixed(0)}% of all voters.
+          </p>
+        </ChartCard>
+      )}
+
+      {/* Per-ward comment cards — weight + behaviour + a data-grounded read */}
+      {rankedWeights.length > 0 && (
+        <ChartCard title="Ward-by-ward read" subtitle="registered-voter weight (hard data) + field-intelligence profile">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {rankedWeights.map((w) => {
+              const pct = pctOf(w.registered);
+              return (
+                <div key={w.name} className="rounded-lg border border-brand-border bg-black/10 p-3">
+                  <div className="flex items-baseline justify-between gap-2 mb-1">
+                    <h3 className="text-sm font-bold text-brand-textActive">{w.name}</h3>
+                    {w.profile && <span className={behaviourBadgeClass(w.profile.behaviour)}>{w.profile.oneLiner}</span>}
+                  </div>
+                  <div className="mb-1 text-[11px] font-semibold" style={{ color: COLORS.sky }}>
+                    {w.registered.toLocaleString()} voters · {pct.toFixed(1)}% of the seat
+                  </div>
+                  {w.profile && <p className="text-xs text-brand-textBody leading-relaxed">{w.profile.note}</p>}
+                  <p className="mt-1 text-[11px] italic text-brand-textMuted">
+                    {pct >= 24 ? 'Must-win — the single biggest source of votes; prioritise turnout ops here.'
+                      : pct >= 19 ? 'Heavy-weight ward — strong turnout here is decisive.'
+                      : 'Every point of turnout matters, but the outcome is set in the larger wards.'}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </ChartCard>
+      )}
+
+      {/* Historical conclusion — honest cross-cycle read */}
+      <ChartCard title="Historical conclusion (2013 → 2022)" subtitle="what three cycles tell us for 2027">
+        <ul className="space-y-2 text-xs text-brand-textBody leading-relaxed list-disc pl-4">
+          <li><strong>Nyali rewards the candidate, not the party.</strong> The clearest signal is 2017, when Mohamed Ali (&ldquo;Jicho Pevu&rdquo;) won the seat as an <strong>independent</strong> — a personal brand beating established party machinery.</li>
+          <li><strong>The field keeps widening.</strong> 2022 was contested by a full official slate of <strong>9 candidates</strong>; a fragmented opposition vote makes a strong, consolidated base decisive.</li>
+          <li><strong>Turnout in the big wards is the whole game.</strong> {rankedWeights[0]?.name} and {rankedWeights[1]?.name} together hold {pctOf((rankedWeights[0]?.registered ?? 0) + (rankedWeights[1]?.registered ?? 0)).toFixed(0)}% of the register — the seat is won or lost on turnout there.</li>
+          <li><strong>Data honesty:</strong> only the 2022 result has a complete official candidate slate. 2013 and 2017 tallies are partial (winner/runner-up only), and there is <em>no</em> published per-ward MP breakdown — so cross-cycle vote-share trends are shown cautiously and ward reads rest on the <em>registered-voter weight</em>, which is hard data.</li>
+        </ul>
+      </ChartCard>
+
       {/* Strategic ward profiles */}
       <ChartCard title="Strategic ward profiles" subtitle="behaviour patterns 2013-2022 — turnout-priority guidance for 2027">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -755,6 +924,142 @@ function PollCard({ poll }: { poll: typeof CURRENT_POLLS[number] }) {
       <div className="flex items-baseline justify-between text-[10px] text-brand-textMuted pt-2 border-t border-brand-border/50">
         {poll.undecidedPct !== undefined && <span>Undecided: <strong className="text-brand-textBody">{poll.undecidedPct}%</strong></span>}
         {poll.othersPct !== undefined && <span>Others: <strong className="text-brand-textBody">{poll.othersPct}%</strong></span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Ward case studies — real per-ward demographics + political framing ─────────
+function TabWardStudies({ demo }: { demo: any[] | null }) {
+  const rows = (demo ?? []).filter((r) => r?.name).map((r) => ({
+    id: String(r.id), name: String(r.name), voters: Number(r.voters),
+    men: Number(r.men), women: Number(r.women),
+    a25_34: Number(r.a25_34), a35_44: Number(r.a35_44), a45_54: Number(r.a45_54), a55p: Number(r.a55p),
+  }));
+  const total = rows.reduce((s, r) => s + r.voters, 0) || 1;
+  const ordered = [...rows].sort((a, b) => b.voters - a.voters);
+
+  return (
+    <div className="space-y-5">
+      {/* Kenya → Mombasa → Nyali → layman */}
+      <ChartCard title="The political picture — Kenya → Mombasa → Nyali" subtitle="how this one seat sits inside the national and Coast landscape">
+        <div className="space-y-2.5">
+          <ContextBlock flag="🇰🇪" label="Kenya (national)" text="In 2022, William Ruto's Kenya Kwanza (UDA) won the presidency over Raila Odinga's Azimio la Umoja. UDA became the dominant governing party nationally." />
+          <ContextBlock flag="🏝️" label="Mombasa & the Coast" text="Mombasa is an ODM / Azimio fortress. In 2022 ODM's Abdulswamad Nassir won the governorship 119,083–98,105 over UDA's Hassan Omar, and ODM swept 23 of 30 wards and 5 of the 6 constituencies. The Coast stayed 'Baba' country." />
+          <ContextBlock flag="📍" label="Nyali (the outlier)" text="Nyali was the exception — the one Mombasa constituency ODM did NOT win. Mohamed Ali ('Jicho Pevu') took the MP seat on UDA with 32,933 votes (~59%), beating ODM's Said Abdallah (18,642). He had already won it in 2017 as an INDEPENDENT, so Nyali has twice rejected the ODM machine." />
+          <ContextBlock flag="🧍" label="In plain terms (layman)" text="Nyali votes for the person, not the party symbol. In a county that goes ODM almost everywhere, it twice chose the maverick investigative journalist — and in 2022 he happened to be on the winning national side. For 2027 the lesson is simple: the seat is won on candidate brand and turnout, not party colours." />
+        </div>
+        <p className="mt-3 text-[10px] text-brand-textMuted">
+          Sources: IEBC declarations via Kenya News Agency &amp; Daily Nation (2022 Mombasa governor); curated Nyali MP history (2013–2022). Per-ward MP tallies are not published, so the ward studies below use the <strong>real voter register</strong> (weight + demographics) — no invented vote counts.
+        </p>
+      </ChartCard>
+
+      <ChartCard title="How to read these" subtitle="what is hard data vs field judgement">
+        <p className="text-xs text-brand-textBody leading-relaxed">
+          Each ward is a case study built on the <strong>imported IEBC voter register</strong> — gender split, age bands and voter weight are <strong>hard numbers</strong>. The one-line behaviour label is qualitative <em>field intelligence</em>, not a vote tally. Note the register is the 2022 roll, so the 18–24 band is effectively empty (those voters register closer to 2027) and ages are counted forward to today.
+        </p>
+      </ChartCard>
+
+      {/* Cross-ward comparison — bars make the voter differences obvious (pies can't) */}
+      <ChartCard title="Registered voters by ward — men vs women" subtitle="the size of each bloc and the gender gap within it (real register counts)">
+        <GroupedBarChart
+          groups={ordered.map((r) => (r.name === "Ziwa La Ng'ombe" ? 'Ziwa' : r.name))}
+          unit=" voters"
+          series={[
+            { label: 'Men', color: COLORS.sky, values: ordered.map((r) => r.men) },
+            { label: 'Women', color: COLORS.ours, values: ordered.map((r) => r.women) },
+          ]}
+        />
+        <p className="mt-2 text-xs text-brand-textMuted leading-relaxed">
+          {ordered[0]?.name} is the largest bloc ({ordered[0]?.voters.toLocaleString()} voters) and the most male-skewed;
+          the smallest is {ordered[ordered.length - 1]?.name} ({ordered[ordered.length - 1]?.voters.toLocaleString()}).
+          Side-by-side bars show the size gaps between wards at a glance — five separate pies can&apos;t.
+        </p>
+      </ChartCard>
+
+      {ordered.map((r) => <WardStudyCard key={r.id} r={r} total={total} />)}
+    </div>
+  );
+}
+
+function ContextBlock({ flag, label, text }: { flag: string; label: string; text: string }) {
+  return (
+    <div className="flex gap-2.5">
+      <span className="text-lg leading-none shrink-0">{flag}</span>
+      <p className="text-xs text-brand-textBody leading-relaxed">
+        <span className="font-bold text-brand-textActive">{label}. </span>{text}
+      </p>
+    </div>
+  );
+}
+
+function WardStudyCard({ r, total }: { r: any; total: number }) {
+  const weight = (r.voters / total) * 100;
+  const menPct = r.voters ? (r.men / r.voters) * 100 : 0;
+  const womenPct = 100 - menPct;
+  const profile = WARD_PROFILES.find((p) => p.name === r.name);
+  const ageBands = [
+    { label: '25–34', v: r.a25_34 }, { label: '35–44', v: r.a35_44 },
+    { label: '45–54', v: r.a45_54 }, { label: '55+', v: r.a55p },
+  ];
+  const maxAge = Math.max(...ageBands.map((a) => a.v), 1);
+  const genderNote = menPct >= 62 ? `a strongly male register (${menPct.toFixed(0)}% men) — the mark of its market and casual-labour economy`
+    : menPct >= 56 ? `a clearly male-tilted register (${menPct.toFixed(0)}% men)`
+    : `the most gender-balanced register in the seat (${menPct.toFixed(0)}% men)`;
+  const weightNote = weight >= 23 ? 'the single largest bloc — turnout here decides the constituency'
+    : weight >= 19 ? 'a heavy-weight ward whose turnout swings the whole result'
+    : 'a mid-sized bloc where every point of turnout counts at the margin';
+
+  return (
+    <div className="rounded-2xl border border-brand-border bg-brand-cardBg overflow-hidden">
+      {/* One ward = one horizontal band, read left → right */}
+      <div className="flex flex-col lg:flex-row lg:items-stretch divide-y lg:divide-y-0 lg:divide-x divide-brand-border">
+        {/* 1 · Identity */}
+        <div className="lg:w-[210px] shrink-0 p-4">
+          <h3 className="text-base font-bold text-brand-textActive leading-tight">{r.name}</h3>
+          <div className="text-[11px] text-brand-textMuted">{r.voters.toLocaleString()} registered</div>
+          <div className="mt-1 text-2xl font-extrabold leading-none" style={{ color: COLORS.ours }}>{weight.toFixed(1)}%</div>
+          <div className="text-[10px] uppercase tracking-wider text-brand-textMuted">of the seat</div>
+          {profile && <div className="mt-1.5"><span className={behaviourBadgeClass(profile.behaviour)}>{profile.oneLiner}</span></div>}
+        </div>
+
+        {/* 2 · Gender split bar — shows the difference plainly */}
+        <div className="lg:w-[250px] shrink-0 p-4 flex flex-col justify-center gap-1.5">
+          <div className="flex items-baseline justify-between text-[10px] font-bold uppercase tracking-wider text-brand-textMuted">
+            <span>Men {menPct.toFixed(0)}%</span><span>Women {womenPct.toFixed(0)}%</span>
+          </div>
+          <div className="flex h-6 w-full overflow-hidden rounded-md">
+            <div className="h-full flex items-center justify-start pl-1.5 text-[10px] font-bold text-white" style={{ width: `${menPct}%`, background: COLORS.sky }}>{r.men.toLocaleString()}</div>
+            <div className="h-full flex items-center justify-end pr-1.5 text-[10px] font-bold text-white" style={{ width: `${womenPct}%`, background: COLORS.ours }}>{r.women.toLocaleString()}</div>
+          </div>
+          <div className="text-[11px] text-brand-textBody">
+            Gap: <b style={{ color: r.men >= r.women ? COLORS.sky : COLORS.ours }}>{Math.abs(r.men - r.women).toLocaleString()} more {r.men >= r.women ? 'men' : 'women'}</b>
+          </div>
+        </div>
+
+        {/* 3 · Age bands (graph) */}
+        <div className="flex-1 min-w-[200px] p-4">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-brand-textMuted mb-1.5">Age bands (register)</div>
+          <div className="space-y-1.5">
+            {ageBands.map((a) => (
+              <div key={a.label} className="flex items-center gap-2">
+                <span className="w-12 shrink-0 text-[11px] text-brand-textMuted">{a.label}</span>
+                <div className="flex-1 h-2.5 rounded-full bg-black/10 overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${(a.v / maxAge) * 100}%`, background: COLORS.sky }} />
+                </div>
+                <span className="w-14 shrink-0 text-right text-[11px] font-bold tabular-nums text-brand-textActive">{a.v.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 4 · The read */}
+        <div className="lg:w-[300px] shrink-0 p-4 bg-black/10">
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: COLORS.ours }}>Analysis</div>
+          <p className="text-xs text-brand-textBody leading-relaxed">
+            Carries {weight.toFixed(1)}% of the register ({weightNote}) with {genderNote}.{profile ? ` ${profile.note}` : ''}
+          </p>
+        </div>
       </div>
     </div>
   );

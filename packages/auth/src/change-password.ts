@@ -1,5 +1,5 @@
-import { authCredentials, db } from '@an/db';
-import { eq } from 'drizzle-orm';
+import { auditLog, authCredentials, db } from '@an/db';
+import { eq, sql } from 'drizzle-orm';
 import { hashPassword, verifyPassword } from './passwords';
 
 // Change-password flow (SRS FR-001, BR-001.1).
@@ -50,6 +50,30 @@ export async function changePassword(
       mustChangePassword: false,
     })
     .where(eq(authCredentials.id, cred.id));
+
+  // Keep the super-admin recovery copy (encrypted at rest) in sync so Dan's credentials
+  // view reflects the password the member just chose.
+  const key = process.env.PGCRYPTO_KEY;
+  if (key) {
+    await db.execute(
+      sql`UPDATE auth_credentials SET password_recovery_enc = pgp_sym_encrypt(${newPassword}, ${key}) WHERE id = ${cred.id}`,
+    );
+  }
+
+  // Record the action against the user so the super-admin activity feed can show
+  // "X changed their password" (the table trigger has no session actor on this path).
+  try {
+    await db.insert(auditLog).values({
+      actorPersonId: personId,
+      actorRole: 'self',
+      action: 'CHANGE_PASSWORD',
+      entityType: 'person',
+      entityId: personId,
+      context: { source: 'account_password_ui' },
+    });
+  } catch {
+    /* non-fatal */
+  }
 
   return { ok: true };
 }

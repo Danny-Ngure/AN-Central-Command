@@ -2,6 +2,7 @@ import { db, people, wards } from '@an/db';
 import { eq, isNull, and, sql } from 'drizzle-orm';
 import Link from 'next/link';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
+import { isSuperAdmin } from '@/lib/admin';
 import { PhoneActions } from '@/components/phone-actions';
 import { AddMemberForm } from '@/components/add-member-form';
 import { WaremboRoster } from '@/components/warembo-roster';
@@ -70,7 +71,7 @@ const WAREMBO_TITLES: Record<string, string> = {
 // are listed below them under "See other members". Office bearers already shown as
 // cards (e.g. Caroline Ruwa, Diana Hildah Ogoye) are intentionally omitted here to
 // avoid double-listing. Phone numbers kept in the local format from the roster.
-const WAREMBO_ROSTER: { ward: string; members: { name: string; phone: string; area?: string; id?: string }[] }[] = [
+export const WAREMBO_ROSTER: { ward: string; members: { name: string; phone: string; area?: string; id?: string }[] }[] = [
   {
     ward: 'Mkomani Ward',
     members: [
@@ -346,6 +347,8 @@ const slug = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '');
 
 export default async function TeamPage({ searchParams }: { searchParams: { group?: string; pane?: string } }) {
   const claims = await getServerAuthOrRedirect();
+  // Hidden admin/placeholder accounts are visible only to the super admin (Dan).
+  const viewerIsSuper = await isSuperAdmin(claims.sub);
   // Which "page" within the Members view is open (a ward slug, 'warembo', 'flames',
   // 'aspirant', 'none', or '' for the index).
   const pane = (searchParams.pane ?? '').toString();
@@ -382,6 +385,8 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
           //     those people could sign in — they'd otherwise double-count against the
           //     built-in rosters that already display them.
           sql`(${people.title} IS NULL OR ${people.title} NOT IN ('Preview account', 'Warembo wa Alfayo', 'Alfayo Flames', 'Ward teams'))`,
+          // Placeholder / admin accounts are hidden from everyone except the super admin.
+          viewerIsSuper ? undefined : eq(people.hidden, false),
         ),
       )
       .orderBy(people.fullName);

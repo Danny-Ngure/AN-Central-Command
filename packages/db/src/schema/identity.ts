@@ -63,6 +63,9 @@ export const people = pgTable(
     agentId: text('agent_id'),
     agentStation: text('agent_station'),
     active: boolean('active').notNull().default(true),
+    // Admin/system/placeholder accounts hidden from the normal team directory;
+    // visible only to the super admin (Dan).
+    hidden: boolean('hidden').notNull().default(false),
     // SRS FR-080 AC-080.1 — "Active in last 7 days" indicator on the team directory.
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),

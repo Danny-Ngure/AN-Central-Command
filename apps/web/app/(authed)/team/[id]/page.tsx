@@ -7,6 +7,8 @@ import { isSuperAdmin } from '@/lib/admin';
 import { PhoneActions } from '@/components/phone-actions';
 import { IdCard } from '@/components/id-card';
 import { AdminResetPassword } from '@/components/admin-reset-password';
+import { AdminChangeRole } from '@/components/admin-change-role';
+import { AdminDeleteUser } from '@/components/admin-delete-user';
 
 // Person 360 — one screen that pulls a team member together with every other
 // place they appear in the system:
@@ -41,6 +43,9 @@ const MANUAL_REGISTRATION: Record<
 export default async function PersonProfile({ params }: { params: { id: string } }) {
   const claims = await getServerAuthOrRedirect();
   const viewerIsSuper = await isSuperAdmin(claims.sub);
+  const wardOptions = viewerIsSuper
+    ? ((await db.execute(sql`SELECT id, name FROM wards ORDER BY name`)) as unknown as { id: string; name: string }[])
+    : [];
 
   const personRows = (await db.execute(sql`
     SELECT p.id, p.full_name, p.role, p.title, p.phone, p.email, p.national_id,
@@ -128,8 +133,27 @@ export default async function PersonProfile({ params }: { params: { id: string }
 
       <h1 className="sr-only">{p.full_name}</h1>
 
-      {/* Super-admin (Dan) only: reset this member's password. */}
-      {viewerIsSuper && <AdminResetPassword personId={p.id} name={p.full_name} />}
+      {/* Super-admin (Dan) only: full control — change role, reset password, delete. */}
+      {viewerIsSuper && (
+        <section className="rounded-2xl border border-brand-burnt/40 bg-brand-burnt/[0.04] p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">★</span>
+            <h2 className="text-base font-bold text-brand-textActive">Super Admin controls</h2>
+            <span className="rounded-full bg-brand-burnt/15 border border-brand-burnt/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-burnt">
+              Only you (Dan) see this
+            </span>
+          </div>
+          <AdminChangeRole
+            personId={p.id}
+            name={p.full_name}
+            currentRole={p.role}
+            currentWardId={p.ward_id}
+            wards={wardOptions}
+          />
+          <AdminResetPassword personId={p.id} name={p.full_name} />
+          <AdminDeleteUser personId={p.id} name={p.full_name} />
+        </section>
+      )}
 
       {/* Member ID card (both sides) */}
       <Section title="Member ID Card" subtitle="Official ANHF membership identification — front &amp; back">

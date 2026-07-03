@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { auditLog, db, people, sessions, wards } from '@an/db';
 import { desc, eq } from 'drizzle-orm';
 import { getServerAuthOrRedirect } from '@/lib/server-auth';
@@ -33,6 +34,34 @@ function actionTone(action: string): string {
     if (action.startsWith(prefix)) return ACTION_STYLE[prefix];
   }
   return 'text-brand-textActive';
+}
+
+// Turn a raw audit row into a plain-English "who did what" for the activity feed.
+const ENTITY_WORD: Record<string, string> = {
+  community_sites: 'a site', community_leaders: 'a community leader', village_issues: 'an issue',
+  villages: 'a village', polling_stations: 'a polling station', people: 'a team member',
+  auth_credentials: 'a password', meetings: 'a meeting', activities: 'an activity',
+  visits: 'a visit', station_reports: 'a station report', incidents: 'an incident',
+  wards: 'a ward', committed_supporters: 'a supporter',
+};
+function describeActivity(action: string, entityType: string | null, after: any): string {
+  const a = (after && typeof after === 'object') ? after : {};
+  const name = a.name || a.target || a.fullName || '';
+  switch (action) {
+    case 'CREATE_SITE': return `Added a ${a.type ?? 'site'}${name ? `: ${name}` : ''}`;
+    case 'CREATE_POLLING_STATION': return `Added a polling station${name ? `: ${name}` : ''}`;
+    case 'CREATE_TEAM_MEMBER': return `Added a team member${name ? `: ${name}` : ''}${a.role ? ` (${a.role})` : ''}`;
+    case 'CHANGE_PASSWORD': return 'Changed their password';
+    case 'ADMIN_RESET_PASSWORD': return `Reset ${a.target ? `${a.target}'s` : 'a'} password`;
+    case 'CHANGE_ROLE': return `Changed ${a.target ?? 'a member'}'s role${a.role ? ` → ${a.role}` : ''}`;
+  }
+  const m = action.match(/^(INSERT|UPDATE|DELETE)_(.+)$/);
+  if (m) {
+    const verb = m[1] === 'INSERT' ? 'Added' : m[1] === 'UPDATE' ? 'Updated' : 'Deleted';
+    const word = ENTITY_WORD[m[2]] ?? m[2].replace(/_/g, ' ');
+    return `${verb} ${word}${name ? `: ${name}` : ''}`;
+  }
+  return action.replace(/_/g, ' ').toLowerCase();
 }
 
 // Turn a raw User-Agent string into a human "phone / device type" label.
@@ -135,21 +164,26 @@ export default async function AuditLogPage() {
 
   // Write audit trail — auditor only. (RLS also restricts this to leadership, but
   // we scope the section to the auditor to match the "only Dan" rule.)
-  const writeRows = isAuditor
+  const writeRowsRaw = isAuditor
     ? await db
         .select({
           id: auditLog.id,
           timestamp: auditLog.timestamp,
           actorRole: auditLog.actorRole,
+          actorName: people.fullName,
           action: auditLog.action,
           entityType: auditLog.entityType,
           entityId: auditLog.entityId,
+          afterValue: auditLog.afterValue,
           ipAddress: auditLog.ipAddress,
         })
         .from(auditLog)
+        .leftJoin(people, eq(people.id, auditLog.actorPersonId))
         .orderBy(desc(auditLog.timestamp))
-        .limit(PAGE_SIZE)
+        .limit(PAGE_SIZE * 3)
     : [];
+  // Sign-ins already appear in the Access log above — keep this feed to actual changes.
+  const writeRows = writeRowsRaw.filter((r) => r.entityType !== 'sessions').slice(0, PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -165,6 +199,14 @@ export default async function AuditLogPage() {
             <span className="text-[10px] uppercase tracking-wider text-white bg-brand-burnt rounded px-2 py-0.5">
               System auditor
             </span>
+          )}
+          {isAuditor && (
+            <Link
+              href="/admin/credentials"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-brand-rust px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-burnt"
+            >
+              🔐 Credentials Vault
+            </Link>
           )}
         </div>
         <p className="text-sm text-brand-textMuted">
@@ -257,35 +299,31 @@ export default async function AuditLogPage() {
             <table className="w-full text-sm">
               <thead className="bg-black/10 border-b border-brand-border">
                 <tr className="text-left text-xs uppercase tracking-wider text-brand-textMuted">
-                  <th className="px-4 py-3 font-semibold">Timestamp</th>
-                  <th className="px-4 py-3 font-semibold">Actor role</th>
-                  <th className="px-4 py-3 font-semibold">Action</th>
-                  <th className="px-4 py-3 font-semibold">Entity</th>
-                  <th className="px-4 py-3 font-semibold">IP</th>
+                  <th className="px-4 py-3 font-semibold">When</th>
+                  <th className="px-4 py-3 font-semibold">Who</th>
+                  <th className="px-4 py-3 font-semibold">Did what</th>
                 </tr>
               </thead>
               <tbody>
                 {writeRows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-brand-textMuted">
-                      No change-history entries yet.
+                    <td colSpan={3} className="px-4 py-8 text-center text-brand-textMuted">
+                      No activity yet.
                     </td>
                   </tr>
                 ) : (
                   writeRows.map((r) => (
                     <tr key={r.id} className="border-b border-brand-border/40 hover:bg-black/20 transition">
-                      <td className="px-4 py-3 text-brand-textMuted font-mono text-xs">{fmt(r.timestamp)}</td>
-                      <td className="px-4 py-3 text-xs uppercase tracking-wider text-brand-textMuted">
-                        {r.actorRole}
+                      <td className="px-4 py-3 text-brand-textMuted font-mono text-xs whitespace-nowrap">{fmt(r.timestamp)}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="font-semibold text-brand-textActive">{r.actorName ?? 'System'}</span>
+                        {r.actorRole && r.actorRole !== 'self' && (
+                          <span className="block text-[10px] uppercase tracking-wider text-brand-textMuted">{r.actorRole}</span>
+                        )}
                       </td>
-                      <td className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${actionTone(r.action)}`}>
-                        {r.action}
+                      <td className={`px-4 py-3 text-sm font-medium ${actionTone(r.action)}`}>
+                        {describeActivity(r.action, r.entityType, r.afterValue)}
                       </td>
-                      <td className="px-4 py-3 text-brand-textMuted font-mono text-xs">
-                        {r.entityType}
-                        {r.entityId && <span className="text-brand-textMuted/60"> · {r.entityId.slice(0, 8)}</span>}
-                      </td>
-                      <td className="px-4 py-3 text-brand-textMuted font-mono text-xs">{r.ipAddress ?? '—'}</td>
                     </tr>
                   ))
                 )}

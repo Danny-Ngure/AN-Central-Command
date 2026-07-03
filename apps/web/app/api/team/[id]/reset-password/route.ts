@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { randomInt } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { hashPassword } from '@an/auth';
 import { authCredentials, auditLog, db, people } from '@an/db';
 import { getServerAuth } from '@/lib/server-auth';
@@ -63,6 +63,15 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       passwordHash: hashed,
       mustChangePassword: true,
     });
+  }
+
+  // Keep the super-admin recovery copy (encrypted) in sync so Dan's credentials page
+  // shows the new temporary password.
+  const key = process.env.PGCRYPTO_KEY;
+  if (key) {
+    await db.execute(
+      sql`UPDATE auth_credentials SET password_recovery_enc = pgp_sym_encrypt(${temp}, ${key}) WHERE person_id = ${person.id}`,
+    );
   }
 
   await db.insert(auditLog).values({
