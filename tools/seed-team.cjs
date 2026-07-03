@@ -68,7 +68,7 @@ const team = [
 
   // ─── Mkomani ──────────────────────────────────────────────────────────
   { phone: '+254700000060', fullName: 'Lucy Ogutu',     role: 'ward_coordinator',           title: 'Ward Representative',           wardId: WARD_IDS.Mkomani         },
-  { phone: '+254700000061', fullName: 'Sammy Otega',    role: 'assistant_ward_coordinator', title: 'Assistant Ward Representative', wardId: WARD_IDS.Mkomani         },
+  { phone: '+254703754630', fullName: 'Sammy Otenga Ogoye', role: 'assistant_ward_coordinator', title: 'Assistant Ward Representative', wardId: WARD_IDS.Mkomani     },
 
   // ─── Kongowea ─────────────────────────────────────────────────────────
   { phone: '+254700000070', fullName: 'Salma Khalef',   role: 'ward_coordinator',           title: 'Ward Representative',           wardId: WARD_IDS.Kongowea        },
