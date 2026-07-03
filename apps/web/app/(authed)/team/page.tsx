@@ -30,6 +30,7 @@ const SUPER_USER_NAMES = new Set([
   'Alfayo Nelson',
   'Benson Imoli',
   'Dan Ngure',
+  'Irene Mkamburi',
 ]);
 
 // Warembo wa Alfayo (women's wing) membership. Add member full names here, or set
@@ -192,6 +193,7 @@ const WAREMBO_ROSTER: { ward: string; members: { name: string; phone: string; ar
       { name: 'Maimuna Mohammed', phone: '0112509504', id: '42898432' },
       { name: 'Farida Mbarak', phone: '0114547361', id: '39493135' },
       { name: 'Bibi Omar', phone: '0717430959', id: '29529866' },
+      { name: 'Damaris Atuga', phone: '0724935918', area: 'Kambi Kikuyu' },
     ],
   },
   {
@@ -308,11 +310,46 @@ const ROLE_LABEL: Record<string, string> = {
   finance_lead: 'Finance Lead',
 };
 
-type Group = 'executive' | 'wards' | 'warembo' | 'flames' | 'all';
+type Group = 'members' | 'executive' | 'wards' | 'warembo' | 'flames' | 'all';
 
-export default async function TeamPage({ searchParams }: { searchParams: { group?: string } }) {
+// Normalised row for the compact "Members list" view (works for DB people and
+// static roster members alike).
+type MemberRowData = {
+  key: string;
+  name: string;
+  photo: string | null;
+  memberId: string | null;
+  subtitle: string;
+  ward: string | null;
+  phone: string | null;
+  nationalId: string | null;
+  station: string | null;
+  stationCode: string | null;
+  isSuper: boolean;
+  profileHref: string | null;
+};
+
+// Soft, eye-friendly tint per ward (used for the Members list ward blocks and the
+// per-ward sub-blocks inside the Warembo / Flames boxes).
+const WARD_TINTS: Record<string, { bg: string; border: string }> = {
+  'Frere Town': { bg: '#EAF2FB', border: '#CBE0F5' },
+  Kadzandani: { bg: '#FCEFE3', border: '#F3D9C2' },
+  Kongowea: { bg: '#EAF6EC', border: '#CDE9D3' },
+  Mkomani: { bg: '#E7F5F4', border: '#C7E7E4' },
+  "Ziwa La Ng'ombe": { bg: '#FBF3DD', border: '#EFE1B8' },
+};
+function wardTint(name: string): { bg: string; border: string } {
+  return WARD_TINTS[name] ?? { bg: '#F4F1EB', border: '#E4DED2' };
+}
+// URL-safe anchor slug so a ward chip can jump straight to that ward's block.
+const slug = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '');
+
+export default async function TeamPage({ searchParams }: { searchParams: { group?: string; pane?: string } }) {
   const claims = await getServerAuthOrRedirect();
-  const group: Group = (['executive', 'wards', 'warembo', 'flames'].includes(searchParams.group ?? '')
+  // Which "page" within the Members view is open (a ward slug, 'warembo', 'flames',
+  // 'aspirant', 'none', or '' for the index).
+  const pane = (searchParams.pane ?? '').toString();
+  const group: Group = (['members', 'executive', 'wards', 'warembo', 'flames'].includes(searchParams.group ?? '')
     ? searchParams.group
     : 'all') as Group;
 
@@ -335,7 +372,18 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
         nationalId: people.nationalId,
       })
       .from(people)
-      .where(and(eq(people.active, true), isNull(people.deletedAt)))
+      .where(
+        and(
+          eq(people.active, true),
+          isNull(people.deletedAt),
+          // Directory shows only real members. Exclude login-only accounts:
+          //   • Dan's "View-As" preview logins ('Preview account')
+          //   • the bulk Warembo/Flames/ward-team login rows that were added just so
+          //     those people could sign in — they'd otherwise double-count against the
+          //     built-in rosters that already display them.
+          sql`(${people.title} IS NULL OR ${people.title} NOT IN ('Preview account', 'Warembo wa Alfayo', 'Alfayo Flames', 'Ward teams'))`,
+        ),
+      )
       .orderBy(people.fullName);
 
     const wardRows = await db.select({ id: wards.id, name: wards.name }).from(wards).orderBy(wards.name);
@@ -343,31 +391,74 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
     return { peopleRows, wardName, wardOrder: wardRows.map((w) => w.id) };
   })();
 
-  // IEBC enrichment — match every roster member (ward teams + warembo) against the
-  // voter register by National ID and attach their polling station. Same direct-read
-  // posture as the Person 360 page (org-info lookup, not RLS-scoped).
-  const pollingByNid: Record<string, { station: string | null; code: string | null; ward: string | null }> = {};
-  const rosterNids = Array.from(
-    new Set(
-      [
-        ...WARD_TEAMS.flatMap((t) => t.members.map((m) => m.id)),
-        ...WAREMBO_ROSTER.flatMap((g) => g.members.map((m) => m.id)),
-      ].filter((x): x is string => !!x),
-    ),
-  );
-  if (rosterNids.length > 0) {
-    const idList = sql.join(rosterNids.map((id) => sql`${id}`), sql`, `);
+  // IEBC enrichment — match every team member (DB people + ward teams + Warembo +
+  // Flames) against the voter register by National ID, PHONE (last 9 digits), and
+  // NAME, then attach their polling station. Name matches are only trusted when
+  // unambiguous (all hits point to the same station) to avoid same-name mix-ups.
+  type Station = { station: string | null; code: string | null; ward: string | null };
+  const digitsOnly = (s?: string | null) => (s ?? '').replace(/\D/g, '');
+  const last9 = (s?: string | null) => { const d = digitsOnly(s); return d.length >= 9 ? d.slice(-9) : ''; };
+  const nameToks = (s?: string | null) => (s ?? '').toUpperCase().match(/[A-Z0-9]+/g) ?? [];
+  const nameKey = (s?: string | null) => [...nameToks(s)].sort().join(''); // order-independent
+
+  const refs: { id?: string | null; phone?: string | null; name: string }[] = [
+    ...data.peopleRows.map((p) => ({ id: p.nationalId, phone: p.phone, name: p.fullName })),
+    ...WARD_TEAMS.flatMap((t) => t.members.map((m) => ({ id: m.id, phone: m.phone, name: m.name }))),
+    ...WAREMBO_ROSTER.flatMap((g) => g.members.map((m) => ({ id: m.id, phone: m.phone, name: m.name }))),
+    ...FLAMES_CREW.map((m) => ({ id: null, phone: m.phone, name: m.name })),
+    ...FLAMES_ROSTER.flatMap((g) => g.members.map((m) => ({ id: null, phone: m.phone, name: m.name }))),
+  ];
+  const ids = Array.from(new Set(refs.map((r) => r.id).filter((x): x is string => !!x)));
+  const phones = Array.from(new Set(refs.map((r) => last9(r.phone)).filter(Boolean)));
+  const nameConcats = new Set<string>();
+  for (const r of refs) {
+    const t = nameToks(r.name);
+    if (t.length >= 2) { nameConcats.add(t.join('')); nameConcats.add([...t].reverse().join('')); }
+  }
+  const nameList = Array.from(nameConcats);
+
+  const pollingByNid: Record<string, Station> = {};
+  const pollingByPhone: Record<string, Station> = {};
+  const pollingByName: Record<string, Station> = {};
+  const conds: any[] = [];
+  if (ids.length) conds.push(sql`v.national_id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`);
+  if (phones.length) conds.push(sql`RIGHT(REGEXP_REPLACE(COALESCE(v.phone, ''), '[^0-9]', '', 'g'), 9) IN (${sql.join(phones.map((p) => sql`${p}`), sql`, `)})`);
+  if (nameList.length) {
+    const nl = sql.join(nameList.map((n) => sql`${n}`), sql`, `);
+    conds.push(sql`UPPER(REGEXP_REPLACE(v.surname || v.first_name, '[^A-Za-z0-9]', '', 'g')) IN (${nl})`);
+    conds.push(sql`UPPER(REGEXP_REPLACE(v.first_name || v.surname, '[^A-Za-z0-9]', '', 'g')) IN (${nl})`);
+  }
+  if (conds.length > 0) {
+    const whereExpr = sql.join(conds, sql` OR `);
     const rows = (await db.execute(sql`
-      SELECT v.national_id AS nid, w.name AS ward_name, ps.name AS ps_name, ps.iebc_code AS ps_code
+      SELECT v.national_id AS nid, v.phone AS phone, v.surname AS surname, v.first_name AS fname,
+             w.name AS ward_name, ps.name AS ps_name, ps.iebc_code AS ps_code
       FROM voters v
       LEFT JOIN wards w ON w.id = v.ward_id
       LEFT JOIN polling_stations ps ON ps.id = v.polling_station_id
-      WHERE v.consent_withdrawn_at IS NULL AND v.national_id IN (${idList})
+      WHERE v.consent_withdrawn_at IS NULL AND (${whereExpr})
     `)) as any[];
+    const nameHits: Record<string, Station[]> = {};
     for (const r of rows) {
-      if (r.nid) pollingByNid[String(r.nid)] = { station: r.ps_name ?? null, code: r.ps_code ?? null, ward: r.ward_name ?? null };
+      const station: Station = { station: r.ps_name ?? null, code: r.ps_code ?? null, ward: r.ward_name ?? null };
+      if (r.nid) pollingByNid[String(r.nid)] = station;
+      const p9 = last9(r.phone);
+      if (p9) pollingByPhone[p9] = station;
+      const k = nameKey((r.surname ?? '') + ' ' + (r.fname ?? ''));
+      if (k) { if (!nameHits[k]) nameHits[k] = []; nameHits[k].push(station); }
+    }
+    for (const [k, hits] of Object.entries(nameHits)) {
+      if (new Set(hits.map((h) => h.station ?? '')).size === 1) pollingByName[k] = hits[0];
     }
   }
+  const pollingFor = (id?: string | null, phone?: string | null, name?: string | null): Station | undefined => {
+    if (id && pollingByNid[id]) return pollingByNid[id];
+    const p9 = last9(phone);
+    if (p9 && pollingByPhone[p9]) return pollingByPhone[p9];
+    const k = nameKey(name);
+    if (k && pollingByName[k]) return pollingByName[k];
+    return undefined;
+  };
 
   const isWardRole = (role: string) =>
     role === 'ward_coordinator' || role === 'assistant_ward_coordinator';
@@ -376,17 +467,31 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
 
   // ── Executive + Technical Team (two sub-groups) ────────────────────────
   const TECH_ROLES = new Set(['tech_lead', 'media_head', 'comms_head']);
+  // Executive Team = the leadership dockets only (from EXEC_ROLE_ORDER, minus the
+  // technical roles which get their own sub-group). Grassroots field roles —
+  // canvasser, polling_agent, polling_station_lead — are NOT executive; they appear
+  // under their ward in the Grassroots & Ward Coordination section instead.
+  const EXECUTIVE_ROLES = new Set(EXEC_ROLE_ORDER.filter((r) => !TECH_ROLES.has(r)));
   // People who should appear in the Executive Team regardless of their role/group
   // (e.g. they also sit on the Warembo docket but lead at the executive level).
   const FORCE_EXECUTIVE = new Set(['Irene Mkamburi']);
+  // Explicit pecking-order overrides by name (win over role-based order). Irene sits
+  // immediately AFTER Cavins Omino (campaign_manager = index 4), per campaign
+  // direction. This is display order only — her admin role/privileges are unchanged.
+  const EXEC_NAME_RANK: Record<string, number> = { 'Irene Mkamburi': 4.5 };
+  const execRank = (p: PersonRow) => {
+    if (p.fullName in EXEC_NAME_RANK) return EXEC_NAME_RANK[p.fullName];
+    const i = EXEC_ROLE_ORDER.indexOf(p.role);
+    return i === -1 ? 99 : i;
+  };
   const execSort = (a: PersonRow, b: PersonRow) => {
-    const ai = EXEC_ROLE_ORDER.indexOf(a.role);
-    const bi = EXEC_ROLE_ORDER.indexOf(b.role);
-    if (ai !== bi) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    const ar = execRank(a);
+    const br = execRank(b);
+    if (ar !== br) return ar - br;
     return a.fullName.localeCompare(b.fullName);
   };
   const executive = data.peopleRows
-    .filter((p) => !isWardRole(p.role) && (FORCE_EXECUTIVE.has(p.fullName) || (!isWarembo(p) && !TECH_ROLES.has(p.role))))
+    .filter((p) => FORCE_EXECUTIVE.has(p.fullName) || (!isWardRole(p.role) && !isWarembo(p) && EXECUTIVE_ROLES.has(p.role)))
     .sort(execSort);
   const technical = data.peopleRows
     .filter((p) => !isWardRole(p.role) && !isWarembo(p) && TECH_ROLES.has(p.role) && !FORCE_EXECUTIVE.has(p.fullName))
@@ -456,7 +561,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
     ward: g.ward,
     members: g.members.map((m) => {
       const r = registry.resolve(m.name, m.phone, m.id);
-      const hit = m.id ? pollingByNid[m.id] : undefined;
+      const hit = pollingFor(m.id, m.phone, m.name);
       return {
         ...m,
         memberId: r?.memberId ?? '—',
@@ -524,13 +629,136 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
   const canAddMembers = CAN_ADD_MEMBERS.has(claims.role);
   const wardList = data.wardOrder.map((id) => ({ id, name: data.wardName.get(id) ?? id }));
 
+  const showMembers = group === 'members';
   const showExec = group === 'all' || group === 'executive';
   const showWards = group === 'all' || group === 'wards';
   const showWarembo = group === 'all' || group === 'warembo';
   const showFlames = group === 'all' || group === 'flames';
 
+  // Normalisers → MemberRowData, for the clustered Members list.
+  const rowFromPerson = (p: PersonRow, showWard = true): MemberRowData => {
+    const nid = p.nationalId;
+    const poll = pollingFor(nid, p.phone, p.fullName);
+    return {
+      key: p.id,
+      name: p.fullName,
+      photo: photoOf(p),
+      memberId: memberIdOf(p) ?? null,
+      subtitle: ROLE_LABEL[p.role] ?? p.role,
+      ward: showWard && p.wardId ? data.wardName.get(p.wardId) ?? null : null,
+      phone: p.phone ?? null,
+      nationalId: nid ?? null,
+      station: poll?.station ?? null,
+      stationCode: poll?.code ?? null,
+      isSuper: SUPER_USER_NAMES.has(p.fullName),
+      profileHref: `/team/${p.id}`,
+    };
+  };
+  const rowFromRoster = (
+    m: { name: string; phone?: string; id?: string; area?: string; title?: string },
+    wardLabel: string | null,
+  ): MemberRowData => {
+    const r = registry.resolve(m.name, m.phone, m.id ?? null);
+    const poll = pollingFor(m.id, m.phone, m.name);
+    return {
+      key: (m.id ?? m.name) + ':' + (wardLabel ?? ''),
+      name: m.name,
+      photo: r?.photoSrc ?? null,
+      memberId: r?.memberId ?? null,
+      subtitle: m.title ?? (m.area ? m.area : 'Member'),
+      ward: wardLabel,
+      phone: m.phone ?? null,
+      nationalId: m.id ?? null,
+      station: poll?.station ?? null,
+      stationCode: poll?.code ?? null,
+      isSuper: false,
+      profileHref: null,
+    };
+  };
+  const shortWard = (w: string) => w.replace(/ Ward$/, '');
+  const memberIdSort = (a: PersonRow, b: PersonRow) =>
+    (memberIdOf(a) ?? 'zzz999').localeCompare(memberIdOf(b) ?? 'zzz999');
+
+  // The Aspirant sits at the very top on his own; everyone else is grouped by their
+  // HOME ward (Ward Rep → Assistants → rest, each by ID). No Executive/Technical
+  // categories in this view — just wards.
+  const alfayo =
+    data.peopleRows.find((p) => p.role === 'candidate') ??
+    data.peopleRows.find((p) => p.fullName === 'Alfayo Nelson') ??
+    null;
+  const normName = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  // Complete ward roster = registered DB people (home ward) + the ward's field-team
+  // roster from data/ward-teams.ts, de-duplicated by name. Ward Rep → Assistants →
+  // rest. This is what makes the Members page match the actual ward teams.
+  const wardBuckets = data.wardOrder
+    .map((wId) => {
+      const wName = data.wardName.get(wId) ?? '—';
+      const db = data.peopleRows
+        .filter((p) => p.wardId === wId && p.id !== alfayo?.id)
+        .sort((a, b) => wardRank(a) - wardRank(b) || memberIdSort(a, b));
+      const dbNames = new Set(db.map((p) => normName(p.fullName)));
+      const dbRows = db.map((p) => rowFromPerson(p, true));
+      const team = WARD_TEAM_BY_NAME[wName]?.members ?? [];
+      const fieldRows = team
+        .filter((m) => !dbNames.has(normName(m.name)))
+        .map((m) => rowFromRoster({ name: m.name, phone: m.phone, id: m.id, area: m.village }, shortWard(wName)));
+      return { wId, name: wName, rows: [...dbRows, ...fieldRows] };
+    })
+    .filter((b) => b.rows.length > 0);
+  const leftover = data.peopleRows
+    .filter((p) => !p.wardId && p.id !== alfayo?.id)
+    .sort(memberIdSort)
+    .map((p) => rowFromPerson(p, true));
+  const totalTeam =
+    (alfayo ? 1 : 0) + wardBuckets.reduce((s, b) => s + b.rows.length, 0) + leftover.length;
+  const selectedWard = wardBuckets.find((b) => slug(b.name) === pane);
+
+  // Warembo / Flames are support groups (not the core team) — each split into its
+  // own per-ward pages. pane looks like 'warembo-<wardSlug>' | 'warembo-office'.
+  const dash = pane.indexOf('-');
+  const panePrefix = dash > 0 ? pane.slice(0, dash) : pane;
+  const paneKey = dash > 0 ? pane.slice(dash + 1) : '';
+  const waremboRows = (key: string): { label: string; rows: MemberRowData[] } | null => {
+    if (key === 'office') return { label: 'Office bearers', rows: warembo.map((p) => rowFromPerson(p, true)) };
+    const g = WAREMBO_ROSTER.find((gr) => slug(shortWard(gr.ward)) === key);
+    return g ? { label: `${shortWard(g.ward)} Ward`, rows: g.members.map((m) => rowFromRoster(m, shortWard(g.ward))) } : null;
+  };
+  const flamesRows = (key: string): { label: string; rows: MemberRowData[] } | null => {
+    if (key === 'office') return { label: 'Office bearers', rows: FLAMES_CREW.map((m) => rowFromRoster(m, null)) };
+    const g = FLAMES_ROSTER.find((gr) => slug(shortWard(gr.ward)) === key);
+    return g ? { label: `${shortWard(g.ward)} Ward`, rows: g.members.map((m) => rowFromRoster(m, shortWard(g.ward))) } : null;
+  };
+  const selWarembo = panePrefix === 'warembo' ? waremboRows(paneKey) : null;
+  const selFlames = panePrefix === 'flames' ? flamesRows(paneKey) : null;
+
+  // Index — one table per group. The SAME ward order is used across all three so
+  // each ward lines up on the same row horizontally. Aspirant / Office bearers are
+  // the first row of each table automatically.
+  const WARD_ROW_ORDER = ['Frere Town', 'Kadzandani', 'Kongowea', 'Mkomani', "Ziwa La Ng'ombe"];
+  const teamByWard = new Map(wardBuckets.map((b) => [b.name, b.rows.length]));
+  const waremboByWard = new Map(WAREMBO_ROSTER.map((g) => [shortWard(g.ward), g.members.length]));
+  const flamesByWard = new Map(FLAMES_ROSTER.map((g) => [shortWard(g.ward), g.members.length]));
+  // Ward buttons (chips) — one per ward. Aspirant / Office bearers are NOT buttons;
+  // they are listed inline in each bar.
+  const teamWardChips = [
+    ...WARD_ROW_ORDER.filter((w) => teamByWard.has(w)).map((w) => ({ label: w, n: teamByWard.get(w) ?? 0, href: `/team?group=members&pane=${slug(w)}` })),
+    ...(leftover.length > 0 ? [{ label: 'No ward', n: leftover.length, href: '/team?group=members&pane=none' }] : []),
+  ];
+  const waremboWardChips = WARD_ROW_ORDER.map((w) => ({ label: w, n: waremboByWard.get(w) ?? 0, href: `/team?group=members&pane=warembo-${slug(w)}` }));
+  const flamesWardChips = WARD_ROW_ORDER.map((w) => ({ label: w, n: flamesByWard.get(w) ?? 0, href: `/team?group=members&pane=flames-${slug(w)}` }));
+  // Default lists shown inline (not behind a button).
+  const aspirantRows = alfayo ? [rowFromPerson(alfayo, true)] : [];
+  const waremboOfficeRows = warembo.map((p) => rowFromPerson(p, true));
+  const flamesOfficeRows = FLAMES_CREW.map((m) => rowFromRoster(m, null));
+
+  const waremboTotal = warembo.length + WAREMBO_ROSTER_COUNT;
+  const flamesTotal = FLAMES_CREW.length + FLAMES_ROSTER_COUNT;
+  const flamesBreakdown = FLAMES_ROSTER.map((g) => ({ ward: shortWard(g.ward), count: g.members.length }));
+
   const TABS: { key: Group; label: string; href: string }[] = [
     { key: 'all', label: 'Everyone', href: '/team' },
+    { key: 'members', label: 'Members list', href: '/team?group=members' },
     { key: 'executive', label: 'Executive', href: '/team?group=executive' },
     { key: 'wards', label: 'All Wards', href: '/team?group=wards' },
     { key: 'warembo', label: 'Warembo', href: '/team?group=warembo' },
@@ -543,8 +771,6 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
         <h1 className="text-2xl font-bold text-brand-textActive">Team Directory</h1>
         <p className="text-sm text-brand-textMuted">
           Alfayo Nelson Hope Foundation campaign organisation. {data.peopleRows.length} active members.
-          <span className="text-brand-burnt"> ★</span> marks the three Super Admins (Alfayo Nelson ·
-          Benson Imoli · Dan Ngure).
         </p>
         {/* Group filter chips (mirror the nav dropdown). */}
         <div className="flex flex-wrap gap-2">
@@ -571,6 +797,65 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
           </div>
         )}
       </header>
+
+      {/* 📇 MEMBERS — three big bars (Ward team / Warembo / Flames), then pages. */}
+      {showMembers && (
+        <div className="space-y-6">
+          {/* Index — three big bars: number + ward buttons; Aspirant / Office bearers listed inline. */}
+          {pane === '' && (
+            <div className="space-y-5">
+              <GroupBar big={totalTeam} unit="active members" accent="#B4530A" wardChips={teamWardChips} defaultLabel="Aspirant" defaultRows={aspirantRows} defaultHref="/team?group=members&pane=aspirant" />
+              <GroupBar big={waremboTotal} unit="Warembo" accent="#DB2777" wardChips={waremboWardChips} defaultLabel="Office bearers" defaultRows={waremboOfficeRows} defaultHref="/team?group=members&pane=warembo-office" />
+              <GroupBar big={flamesTotal} unit="Alfayo Flames crew" accent="#7C3AED" wardChips={flamesWardChips} defaultLabel="Office bearers" defaultRows={flamesOfficeRows} defaultHref="/team?group=members&pane=flames-office" />
+            </div>
+          )}
+
+          {/* A specific page — with a clear way back to the bars. */}
+          {pane !== '' && (
+            <Link href="/team?group=members" className="inline-flex items-center gap-2 min-h-[40px] rounded-lg border border-brand-borderStrong bg-brand-cardBg px-3 py-2 text-sm font-semibold text-brand-textActive shadow-sm hover:border-brand-burnt hover:text-brand-burnt transition">
+              <span className="text-base">←</span> Back to team overview
+            </Link>
+          )}
+
+          {/* Aspirant page */}
+          {pane === 'aspirant' && alfayo && (
+            <section className="space-y-2">
+              <h3 className="text-lg font-extrabold text-brand-textActive">Aspirant</h3>
+              <div className="rounded-2xl border-2 overflow-hidden" style={{ backgroundColor: '#FFF4E9', borderColor: '#F3C79B' }}>
+                <MemberRow n={1} r={rowFromPerson(alfayo, true)} />
+              </div>
+            </section>
+          )}
+
+          {/* Single ward page */}
+          {selectedWard && (
+            <MemberGroup title={`${selectedWard.name} Ward`} count={selectedWard.rows.length} tint={wardTint(selectedWard.name)}>
+              {selectedWard.rows.map((r, i) => <MemberRow key={`${r.key}:${i}`} n={i + 1} r={r} />)}
+            </MemberGroup>
+          )}
+
+          {/* No-home-ward page */}
+          {pane === 'none' && leftover.length > 0 && (
+            <MemberGroup title="No home ward" count={leftover.length}>
+              {leftover.map((r, i) => <MemberRow key={`${r.key}:${i}`} n={i + 1} r={r} />)}
+            </MemberGroup>
+          )}
+
+          {/* Warembo — a single ward's page */}
+          {selWarembo && (
+            <MemberGroup title={`Warembo · ${selWarembo.label}`} count={selWarembo.rows.length} tint={{ bg: '#FBE9F1', border: '#F1C6DC' }}>
+              {selWarembo.rows.map((r, i) => <MemberRow key={`${r.key}:${i}`} n={i + 1} r={r} />)}
+            </MemberGroup>
+          )}
+
+          {/* Flames — a single ward's page */}
+          {selFlames && (
+            <MemberGroup title={`Alfayo Flames · ${selFlames.label}`} count={selFlames.rows.length} tint={{ bg: '#F1EAFB', border: '#D9C7F2' }}>
+              {selFlames.rows.map((r, i) => <MemberRow key={`${r.key}:${i}`} n={i + 1} r={r} />)}
+            </MemberGroup>
+          )}
+        </div>
+      )}
 
       {/* 🛠 EXECUTIVE TEAM */}
       {showExec && executive.length > 0 && (
@@ -638,7 +923,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
             const wardTeam = WARD_TEAM_BY_NAME[wName];
             const wardTeamMembers = (wardTeam?.members ?? []).map((m) => {
               const r = registry.resolve(m.name, m.phone, m.id);
-              const hit = m.id ? pollingByNid[m.id] : undefined;
+              const hit = pollingFor(m.id, m.phone, m.name);
               return {
                 ...m,
                 memberId: r?.memberId ?? '—',
@@ -652,8 +937,16 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
             return (
               <div key={wId} className="rounded-2xl border border-brand-border bg-brand-cardBg/50 p-4 space-y-4">
                 {/* Leaders only by default; the button below reveals the whole list. */}
-                <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                  <h3 className="text-base font-bold text-brand-textActive">{wName} Ward</h3>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex items-baseline gap-1.5 rounded-xl bg-brand-teal/10 border-2 border-brand-teal/40 px-3 py-1.5">
+                      <span className="text-2xl font-extrabold text-brand-teal tabular-nums leading-none">
+                        {(inCharge ? 1 : 0) + wardAssistants.length + (wardTeam?.members.length ?? 0) + otherMembers.length}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-brand-teal">members</span>
+                    </span>
+                    <h3 className="text-lg font-extrabold text-brand-textActive">{wName} Ward</h3>
+                  </div>
                   {inCharge && (
                     <span className="text-[10px] font-bold uppercase tracking-wider text-brand-burnt">
                       Person in Charge: {inCharge.fullName}
@@ -849,6 +1142,242 @@ function CardGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{children}</div>;
 }
 
+// A clickable number cell in the summary table.
+function TableNum({ n, href }: { n?: number; href: string }) {
+  if (!n) return <span className="text-brand-textMuted">—</span>;
+  return (
+    <Link href={href} className="inline-flex items-center gap-0.5 font-extrabold tabular-nums text-brand-burnt hover:underline">
+      {n}<span className="text-xs">›</span>
+    </Link>
+  );
+}
+
+// One group's big bar: big total number + ward buttons on top; the default list
+// (Aspirant / Office bearers) is shown inline below — not behind a button.
+function GroupBar({
+  big, unit, accent, wardChips, defaultLabel, defaultRows, defaultHref,
+}: {
+  big: number;
+  unit: string;
+  accent: string;
+  wardChips: { label: string; n: number; href: string }[];
+  defaultLabel: string;
+  defaultRows: MemberRowData[];
+  defaultHref?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-brand-border bg-brand-cardBg overflow-hidden">
+      {/* Header: big number + chips. The leading accent chip is the default group
+          (Aspirant / Office bearers); with it, all chips add up to the big number. */}
+      <div className="p-5 flex items-center gap-5 flex-wrap border-b border-brand-border">
+        <div className="flex items-baseline gap-2 shrink-0">
+          <span className="text-6xl font-extrabold tabular-nums leading-none" style={{ color: accent }}>{big}</span>
+          <span className="text-sm font-bold uppercase tracking-wide text-brand-textActive leading-tight max-w-[7rem]">{unit}</span>
+        </div>
+        <div className="flex flex-wrap gap-2 flex-1 min-w-0">
+          {defaultRows.length > 0 && (
+            <CountChip label={defaultLabel} n={defaultRows.length} href={defaultHref} accentColor={accent} />
+          )}
+          {wardChips.map((r) => <CountChip key={r.label} label={r.label} n={r.n} href={r.href} />)}
+        </div>
+      </div>
+      {/* Default list — listed inline */}
+      {defaultRows.length > 0 && (
+        <div>
+          <div className="px-5 py-2.5 bg-brand-cardBgHeavy/40 border-b border-brand-border flex items-baseline justify-between gap-2">
+            <span className="text-sm font-extrabold uppercase tracking-wider text-brand-textActive">{defaultLabel}</span>
+            <span className="inline-flex items-baseline gap-1">
+              <span className="text-xl font-extrabold text-brand-burnt tabular-nums leading-none">{defaultRows.length}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-brand-textMuted">listed</span>
+            </span>
+          </div>
+          <div className="divide-y divide-black/5">
+            {defaultRows.map((r, i) => <MemberRow key={`${r.key}:${i}`} n={i + 1} r={r} />)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Members-list group + row (compact, big, expandable) ─────────────────────
+function CountChip({ label, n, href, active, accentColor }: { label: string; n: number; href?: string; active?: boolean; accentColor?: string }) {
+  // accentColor renders a filled chip in the group's accent (used for the leading
+  // "category" chip — Aspirant / Office bearers — so every big number equals the
+  // visible sum of its chips).
+  const filled = active || !!accentColor;
+  const base = 'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 transition select-none';
+  const filledStyle = accentColor ? { backgroundColor: accentColor, borderColor: accentColor } : undefined;
+  const inner = (
+    <>
+      <span className={`text-lg font-extrabold tabular-nums leading-none ${filled ? 'text-white' : 'text-brand-textActive'}`}>{n}</span>
+      <span className={`text-xs font-semibold ${filled ? 'text-white/90' : 'text-brand-textBody'}`}>{label}</span>
+      {href && <span className={`ml-0.5 text-sm font-bold leading-none ${filled ? 'text-white/80' : 'text-brand-burnt'}`}>›</span>}
+    </>
+  );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        style={filledStyle}
+        className={`${base} cursor-pointer shadow-sm active:scale-[0.97] ${accentColor ? 'hover:opacity-90 hover:shadow' : active ? 'bg-brand-burnt border-brand-burnt' : 'bg-brand-cardBg border-brand-borderStrong hover:border-brand-burnt hover:bg-brand-burnt/10 hover:shadow'}`}
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return <span style={filledStyle} className={`${base} ${accentColor ? '' : 'bg-brand-cardBgHeavy/50 border-brand-border'}`}>{inner}</span>;
+}
+
+function MemberGroup({
+  title, count, breakdown, tint, id, children,
+}: {
+  title: string;
+  count: number;
+  breakdown?: { ward: string; count: number }[];
+  tint?: { bg: string; border: string };
+  id?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className="space-y-2 scroll-mt-28">
+      <div className="border-b-2 border-brand-burnt/30 pb-2 space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-xl font-extrabold text-brand-textActive">{title}</h3>
+          <span className="shrink-0 inline-flex items-baseline gap-1">
+            <span className="text-2xl font-extrabold text-brand-burnt tabular-nums leading-none">{count}</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-brand-burnt">members</span>
+          </span>
+        </div>
+        {breakdown && breakdown.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {breakdown.map((b) => <CountChip key={b.ward} label={b.ward} n={b.count} />)}
+          </div>
+        )}
+      </div>
+      <div
+        className={`rounded-2xl border overflow-hidden divide-y ${tint ? 'divide-black/5' : 'border-brand-border bg-brand-cardBg divide-brand-border/60'}`}
+        style={tint ? { backgroundColor: tint.bg, borderColor: tint.border } : undefined}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
+// A colour-tinted sub-block (a ward, or "Office bearers") inside a TeamBox.
+function SubBlock({
+  title, count, tint, id, children,
+}: {
+  title: string;
+  count: number;
+  tint: { bg: string; border: string };
+  id?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div id={id} className="rounded-xl border overflow-hidden scroll-mt-28" style={{ backgroundColor: tint.bg, borderColor: tint.border }}>
+      <div className="flex items-baseline justify-between gap-2 px-3 py-2 border-b" style={{ borderColor: tint.border }}>
+        <span className="text-base font-extrabold text-brand-textActive">{title}</span>
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-xl font-extrabold text-brand-textActive tabular-nums leading-none">{count}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-brand-textMuted">members</span>
+        </span>
+      </div>
+      <div className="divide-y divide-black/5">{children}</div>
+    </div>
+  );
+}
+
+// Outer coloured box for Warembo (pink) / Flames (purple), holding per-ward sub-blocks.
+function TeamBox({
+  title, total, breakdown, boxTint, anchorPrefix, id, children,
+}: {
+  title: string;
+  total: number;
+  breakdown?: { ward: string; count: number }[];
+  boxTint: { bg: string; border: string };
+  anchorPrefix?: string;
+  id?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className="rounded-2xl border p-4 space-y-3 scroll-mt-28" style={{ backgroundColor: boxTint.bg, borderColor: boxTint.border }}>
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-2xl font-extrabold text-brand-textActive">{title}</h3>
+          <span className="shrink-0 inline-flex items-baseline gap-1.5">
+            <span className="text-3xl font-extrabold text-brand-textActive tabular-nums leading-none">{total}</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-brand-textMuted">members</span>
+          </span>
+        </div>
+        {breakdown && breakdown.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {breakdown.map((b) => (
+              <CountChip key={b.ward} label={b.ward} n={b.count} href={anchorPrefix ? `#${anchorPrefix}-${slug(b.ward)}` : undefined} />
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+function MemberRow({ r, n }: { r: MemberRowData; n?: number }) {
+  const initials = r.name.split(' ').filter(Boolean).slice(0, 2).map((s) => s[0]).join('').toUpperCase();
+  return (
+    <details className="group">
+      <summary className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-black/5 list-none">
+        {typeof n === 'number' && (
+          <span className="w-7 shrink-0 text-right text-base font-extrabold text-brand-textMuted tabular-nums">{n}.</span>
+        )}
+        {r.photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={r.photo} alt="" className="w-12 h-12 rounded-full object-cover border border-brand-border shrink-0" />
+        ) : (
+          <span className="w-12 h-12 rounded-full bg-brand-teal/15 text-brand-teal flex items-center justify-center text-sm font-bold shrink-0">{initials}</span>
+        )}
+        <span className="flex-1 min-w-0">
+          <span className="block text-base font-bold text-brand-textActive truncate">
+            {r.name}
+          </span>
+          <span className="block text-xs text-brand-textMuted truncate">{r.subtitle}{r.ward ? ` · ${r.ward}` : ''}</span>
+        </span>
+        {r.memberId && (
+          <span className="shrink-0 rounded-md bg-brand-burnt/10 border border-brand-burnt/30 px-2.5 py-1 text-xs font-mono font-bold text-brand-burnt">{r.memberId}</span>
+        )}
+        <svg className="w-5 h-5 text-brand-textMuted transition-transform group-open:rotate-180 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </summary>
+      <div className="px-4 pb-4 pl-[4.5rem] text-sm text-brand-textBody">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+          <div><span className="text-brand-textMuted">Member ID:</span> <span className="font-mono font-bold text-brand-textActive">{r.memberId ?? '—'}</span></div>
+          <div><span className="text-brand-textMuted">Role:</span> {r.subtitle}</div>
+          {r.ward && <div><span className="text-brand-textMuted">Ward:</span> {r.ward}</div>}
+          <div><span className="text-brand-textMuted">National ID:</span> {r.nationalId ?? '—'}</div>
+          {r.station && (
+            <div className="sm:col-span-2"><span className="text-brand-textMuted">Votes at:</span> {r.station}{r.stationCode ? ` (${r.stationCode})` : ''}</div>
+          )}
+          {r.phone && (
+            <div className="sm:col-span-2 flex items-center gap-2">
+              <span className="text-brand-textMuted">Phone:</span>
+              <span className="font-mono">{r.phone}</span>
+              <PhoneActions phone={r.phone} size="sm" />
+            </div>
+          )}
+        </div>
+        {r.profileHref && (
+          <div className="pt-2">
+            <Link href={r.profileHref} className="text-xs font-semibold text-brand-tealBlue hover:text-brand-burnt">View 360 profile →</Link>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
 // Palette tones for person cards — picked per name so each reads distinctly.
 // Full class strings so Tailwind JIT generates them.
 const PERSON_TONES = [
@@ -883,7 +1412,6 @@ interface PersonRow {
 function PersonCard({
   p,
   wardName,
-  isSuperUser,
   operationalBase,
   highlight,
   forceLabel,
@@ -893,7 +1421,9 @@ function PersonCard({
 }: {
   p: PersonRow;
   wardName: string | null;
-  isSuperUser: boolean;
+  // Kept so existing call sites compile; Super Admin status is intentionally NOT
+  // shown anywhere in the UI (no stars, no badge).
+  isSuperUser?: boolean;
   operationalBase?: string | null;
   highlight?: boolean;
   forceLabel?: string;
@@ -931,24 +1461,9 @@ function PersonCard({
             className="w-24 h-24 rounded-full object-cover border-2 border-brand-brown/50"
           />
         ) : (
-          <div
-            className={[
-              'w-24 h-24 rounded-full border-2 flex items-center justify-center text-2xl font-bold',
-              isSuperUser
-                ? 'bg-brand-burnt/15 border-brand-burnt/50 text-brand-burnt'
-                : 'bg-brand-teal/10 border-brand-teal/40 text-brand-teal',
-            ].join(' ')}
-          >
+          <div className="w-24 h-24 rounded-full border-2 bg-brand-teal/10 border-brand-teal/40 text-brand-teal flex items-center justify-center text-2xl font-bold">
             {initials}
           </div>
-        )}
-        {isSuperUser && (
-          <span
-            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand-gold text-black text-sm font-bold flex items-center justify-center border-2 border-brand-cardBg"
-            title="Super Admin"
-          >
-            ★
-          </span>
         )}
       </div>
 
@@ -979,17 +1494,8 @@ function PersonCard({
         </Link>
       )}
 
-      {/* Badges */}
+      {/* Badges — Super Admin status is intentionally not shown. */}
       <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
-        {isSuperUser ? (
-          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-brand-burnt/20 text-brand-burnt border border-brand-burnt/40">
-            ★ Super Admin
-          </span>
-        ) : (
-          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-brand-olive/20 text-brand-olive border border-brand-olive/40">
-            Peer
-          </span>
-        )}
         {dualRole && (
           <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-brand-teal/20 text-brand-teal border border-brand-teal/40" title="Holds two roles">
             Dual role
