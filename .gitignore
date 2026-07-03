@@ -67,3 +67,10 @@ tools/data/*.sql
 
 # ngrok tunnel policy (contains basic-auth credentials)
 ngrok-policy.yml
+
+# --- Sensitive: credential dumps / PII (never commit) ---
+Login-Credentials.pdf
+*-LOGINS.pdf
+*credentials*.pdf
+fix-admin-login.ps1
+packages/auth/src/dev/roster-data.json
