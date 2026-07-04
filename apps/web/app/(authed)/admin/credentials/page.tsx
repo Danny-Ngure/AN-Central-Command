@@ -74,6 +74,32 @@ export default async function CredentialsVault() {
         </p>
       </header>
 
+      {/* Database backup — super-admin download (contains PII; never share publicly) */}
+      <div className="rounded-xl border border-brand-teal/40 bg-brand-teal/[0.06] p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-base">💾</span>
+          <h2 className="text-sm font-bold text-brand-textActive">Database backup</h2>
+        </div>
+        <p className="mt-1 text-xs text-brand-textMuted">
+          Download a fresh dump of the whole database (schema + all data). Contains voter PII and password
+          hashes — keep it private, don&rsquo;t upload it anywhere public.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            href="/api/admin/backup"
+            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-brand-teal px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-burnt"
+          >
+            ⬇️ Download backup (.dump · compressed)
+          </a>
+          <a
+            href="/api/admin/backup?format=sql"
+            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-brand-borderStrong px-4 py-2 text-sm font-semibold text-brand-textActive transition hover:border-brand-burnt hover:text-brand-burnt"
+          >
+            ⬇️ Download as .sql (plain, larger)
+          </a>
+        </div>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-brand-border">
         <table className="w-full text-sm">
           <thead>

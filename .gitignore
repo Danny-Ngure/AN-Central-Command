@@ -77,3 +77,7 @@ packages/auth/src/dev/roster-data.json
 
 # Contains hardcoded admin passwords — local only
 packages/auth/src/dev/set-tiered-passwords.ts
+
+# DB dumps — contain PII, never commit
+*.dump
+alfayo_dev_*.sql

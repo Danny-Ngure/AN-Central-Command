@@ -17,7 +17,6 @@ Where the code and the SRS disagree, the **SRS is authoritative**.
 | Workspace | Application | Stack |
 |---|---|---|
 | `apps/web` | Central Command (web) + API | Next.js 14 App Router, Drizzle, Auth.js |
-| `apps/field` | Field App (mobile, campaign-season data collection) | Expo SDK 51+, Expo SQLite |
 | `apps/nyalitrack` | NyaliTrack (mobile, election-day operations) | Expo SDK 51+, WebSocket |
 
 Shared:
