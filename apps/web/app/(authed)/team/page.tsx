@@ -612,7 +612,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { group
   // appear in their Executive/Warembo docket above).
   const wardRank = (p: PersonRow) =>
     p.role === 'ward_coordinator' ? 0 : p.role === 'assistant_ward_coordinator' ? 1 : 2;
-  const byWard = new Map<string, typeof data.peopleRows>();
+  const byWard = new Map<string, PersonRow[]>();
   const pushWard = (wId: string, p: PersonRow) => {
     (byWard.get(wId) ?? byWard.set(wId, []).get(wId)!).push(p);
   };

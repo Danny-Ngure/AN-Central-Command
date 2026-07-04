@@ -16,6 +16,7 @@
     "@an/db": "workspace:*",
     "@an/i18n": "workspace:*",
     "@an/types": "workspace:*",
+    "drizzle-orm": "^0.36.4",
     "mapbox-gl": "^3.8.0",
     "next": "^14.2.18",
     "qrcode": "^1.5.4",
