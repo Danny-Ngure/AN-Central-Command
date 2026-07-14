@@ -11,19 +11,38 @@ import * as schema from './schema/index';
 // This factory does not set session variables — the caller (route handler, worker)
 // does that per-transaction via setRequestContext() before executing queries.
 
-const url = process.env.DATABASE_URL;
-if (!url) {
-  throw new Error('DATABASE_URL is not set. See packages/db/.env.example.');
+// Lazy singleton. The connection (and the DATABASE_URL check) is deferred to the
+// first actual query rather than module import, so `next build` can import route
+// modules during "Collecting page data" without a database URL present. Runtime
+// still requires DATABASE_URL — the error just surfaces on first use, not import.
+type Db = ReturnType<typeof drizzle<typeof schema>>;
+let _db: Db | undefined;
+
+function getDb(): Db {
+  if (_db) return _db;
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL is not set. See packages/db/.env.example.');
+  }
+  const client = postgres(url, {
+    max: 20,
+    idle_timeout: 30,
+    connect_timeout: 10,
+    prepare: false,
+  });
+  _db = drizzle(client, { schema });
+  return _db;
 }
 
-const client = postgres(url, {
-  max: 20,
-  idle_timeout: 30,
-  connect_timeout: 10,
-  prepare: false,
-});
-
-export const db = drizzle(client, { schema });
+// Proxy so existing `db.select(...)` / `db.transaction(...)` / `db.query.*` usage
+// is unchanged, but the underlying client is only built on first property access.
+export const db = new Proxy({} as Db, {
+  get(_target, prop, receiver) {
+    const real = getDb();
+    const value = Reflect.get(real as object, prop, receiver);
+    return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(real) : value;
+  },
+}) as Db;
 
 // Per-request RLS context setter.
 // Call inside a transaction before executing queries.
