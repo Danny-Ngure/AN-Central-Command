@@ -10,6 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:apply-extras": "tsx src/apply-extras.ts",
+    "db:provision": "tsx src/provision.ts",
     "db:migrate:all": "pnpm db:migrate && pnpm db:apply-extras",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
