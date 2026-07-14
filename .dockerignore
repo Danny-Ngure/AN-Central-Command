@@ -1,0 +1,35 @@
+# Keep the Docker build context small and reproducible.
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/build
+**/out
+**/*.tsbuildinfo
+
+.git
+.github
+.vscode
+.idea
+
+# Env / secrets — never bake into the image
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Local infra + data
+infra/data
+tools/data/*.json
+tools/data/*.geojson
+tools/data/*.zip
+tools/data/*.sql
+
+# Native app (not part of the web build)
+apps/field
+
+# Logs & misc
+*.log
+ngrok-run.log
+ngrok-policy.yml
+**/.DS_Store
+Thumbs.db
